@@ -15,6 +15,7 @@ import {
   WORLD_WIDTH,
 } from '../sim/types';
 import { SimulationWorld } from '../sim/World';
+import { CollapseEngine } from '../sim/CollapseEngine';
 import { predictTrajectory } from '../sim/EMFieldSolver';
 
 export interface RenderUIState {
@@ -28,7 +29,7 @@ export interface RenderUIState {
 }
 
 /**
- * 冷冽精密的 90 年代军工实验室示波器 × 量子概率云干涉渲染器
+ * 冷冽精密的军工示波器蓝图 × 多体量子概率云干涉 × 宏聚变共振渲染器
  */
 export class BlueprintRenderer {
   private ctx: CanvasRenderingContext2D;
@@ -70,40 +71,47 @@ export class BlueprintRenderer {
     // 1. 深空蓝图基底 & 坐标点阵
     this.drawBackground(world, ui);
 
-    // 2. 物理观测光锥多边形（真实视线遮挡与玻璃穿透视觉表现）
+    // 2. 物理观测光锥多边形
     this.drawObserverCones(world, ui.visualTime);
 
-    // 3. 量子概率云干涉密度场（处于 cloud 模式时渲染）
-    if (world.electron && world.electron.alive && world.electron.mode === 'cloud') {
-      this.drawProbabilityCloud(world, world.electron, ui.visualTime);
+    // 3. 多颗量子概率云干涉密度场
+    for (const e of world.electrons) {
+      if (!e.alive || e.mode !== 'cloud') continue;
+      const eng = world.collapseEngines.get(e.id);
+      if (eng) {
+        this.drawProbabilityCloud(world, e, eng, ui.visualTime);
+      }
     }
 
-    // 4. 电磁场装置及其动态力线
+    // 4. 电磁场装置、光学遮蔽幕与便携观测信标
     for (const dev of world.devices) {
-      this.drawDevice(dev, ui.selectedDeviceId === dev.id, ui.visualTime);
+      this.drawDevice(world, dev, ui.selectedDeviceId === dev.id, ui.visualTime);
     }
 
-    // 5. 墙体（混凝土 / 防弹玻璃 / 钢制重门）
+    // 5. 墙体（混凝土 / 防弹玻璃 / 钢制重门 / 导电金属导流壁）
     for (const wall of world.walls) {
-      this.drawWall(wall, ui.blueprintMode);
+      this.drawWall(wall, ui.blueprintMode, ui.visualTime);
     }
 
-    // 6. 实体目标与材质频段徽章（含仅暗区可见的蓝玫瑰量子幽灵）
+    // 6. 实体目标与量子幽灵干涉连线
     for (const ent of world.entities) {
       this.drawEntity(world, ent, ui.blueprintMode, ui.visualTime);
     }
 
-    // 7. 观测源硬件节点（探照灯 / 主动观测信标）
+    // 7. 固定观测源硬件节点（探照灯 / 窗外信标）
     for (const obs of world.observers) {
+      if (obs.sourceDeviceId) continue; // 便携信标由 drawDevice 绘制
       this.drawObserverHardware(obs, ui.visualTime);
     }
 
-    // 8. 雷球发生器与瞄准预测轨道
+    // 8. 雷球发生器与前瞻预测轨道
     this.drawEmitterAndPrediction(world, ui);
 
-    // 9. 活跃经典态球状闪电（双层等离子辉光 + 随机电弧）
-    if (world.electron && world.electron.alive && world.electron.mode === 'classical') {
-      this.drawClassicalElectron(world.electron, ui.visualTime);
+    // 9. 多颗活跃经典态球状闪电
+    for (const e of world.electrons) {
+      if (e.alive && e.mode === 'classical') {
+        this.drawClassicalElectron(e, ui.visualTime);
+      }
     }
 
     // 10. 放置工具半透明预览
@@ -111,7 +119,7 @@ export class BlueprintRenderer {
       this.drawPlacementGhost(ui.placementTool, ui.mouseX, ui.mouseY);
     }
 
-    // 11. 瞬态物理特效（坍缩内爆、选择性气化、次生殉爆、充能电弧）
+    // 11. 瞬态物理特效（坍缩内爆、宏聚变、选择性气化、次生殉爆、充能电弧）
     for (const fx of world.fxEvents) {
       this.drawFx(fx);
     }
@@ -127,7 +135,6 @@ export class BlueprintRenderer {
     ctx.fillStyle = world.level.ambientObserved ? '#0a101b' : '#05070c';
     ctx.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
-    // 蓝图坐标网格
     const major = 60;
     ctx.strokeStyle = ui.blueprintMode
       ? 'rgba(0, 229, 255, 0.11)'
@@ -144,12 +151,17 @@ export class BlueprintRenderer {
     }
     ctx.stroke();
 
-    // 若为真实观测关卡，轻微标注暗区背景文字水印
     if (!world.level.ambientObserved) {
       ctx.save();
       ctx.font = '600 10px Menlo, monospace';
       ctx.fillStyle = 'rgba(110, 145, 190, 0.22)';
       ctx.fillText('DARK REGION // UNOBSERVED QUANTUM SUPERPOSITION FIELD', 20, WORLD_HEIGHT - 16);
+      ctx.restore();
+    } else if (world.level.macroFusionEnabled) {
+      ctx.save();
+      ctx.font = '600 10px Menlo, monospace';
+      ctx.fillStyle = 'rgba(0, 229, 255, 0.28)';
+      ctx.fillText('MACRO-FUSION PROTOCOL ACTIVE // DUAL ELECTRON COUPLING ZONE', 20, WORLD_HEIGHT - 16);
       ctx.restore();
     }
   }
@@ -159,7 +171,9 @@ export class BlueprintRenderer {
     const ctx = this.ctx;
 
     for (const obs of world.observers) {
-      if (!obs.active || obs.polygon.length < 3) continue;
+      if (!obs.active || obs.permanentlyDisabled || obs.suppressedByGhost || obs.polygon.length < 3) {
+        continue;
+      }
 
       const isPlayer = obs.owner === 'player';
       const grad = ctx.createRadialGradient(obs.x, obs.y, 10, obs.x, obs.y, obs.range);
@@ -168,9 +182,9 @@ export class BlueprintRenderer {
         grad.addColorStop(0.55, 'rgba(126, 231, 135, 0.11)');
         grad.addColorStop(1, 'rgba(126, 231, 135, 0.02)');
       } else {
-        grad.addColorStop(0, 'rgba(255, 120, 90, 0.26)');
-        grad.addColorStop(0.6, 'rgba(255, 105, 80, 0.12)');
-        grad.addColorStop(1, 'rgba(255, 90, 70, 0.02)');
+        grad.addColorStop(0, 'rgba(255, 110, 80, 0.28)');
+        grad.addColorStop(0.6, 'rgba(255, 95, 75, 0.13)');
+        grad.addColorStop(1, 'rgba(255, 85, 65, 0.02)');
       }
 
       ctx.save();
@@ -183,10 +197,9 @@ export class BlueprintRenderer {
       ctx.fillStyle = grad;
       ctx.fill();
 
-      // 细微扫描光锥轮廓线
       ctx.strokeStyle = isPlayer
         ? `rgba(126, 231, 135, ${0.32 + Math.sin(t * 3) * 0.06})`
-        : 'rgba(255, 110, 85, 0.36)';
+        : 'rgba(255, 110, 85, 0.42)';
       ctx.lineWidth = 1.2;
       ctx.stroke();
       ctx.restore();
@@ -196,10 +209,11 @@ export class BlueprintRenderer {
   private drawProbabilityCloud(
     world: SimulationWorld,
     electron: MacroElectronState,
+    engine: CollapseEngine,
     t: number
   ): void {
     const ctx = this.ctx;
-    const psi = world.collapseEngine.psi;
+    const psi = engine.psi;
     const meta = SPECTRUM_META[electron.spectrum];
 
     ctx.save();
@@ -211,17 +225,15 @@ export class BlueprintRenderer {
         if (val < 0.03) continue;
 
         const cx = (gx + 0.5) * GRID_CELL;
-        // 量子干涉条纹调制：正弦波纹赋予流动的薛定谔波函数质感
-        const wave = 0.72 + 0.28 * Math.sin((gx * 0.65 + gy * 0.55) - t * 6.5);
-        const alpha = Math.min(0.82, val * 0.75 * wave);
+        const wave = 0.7 + 0.3 * Math.sin(gx * 0.65 + gy * 0.55 - t * 6.8);
+        const alpha = Math.min(0.84, val * 0.76 * wave);
 
-        ctx.fillStyle = hexToRgba(meta.color, alpha * 0.55);
+        ctx.fillStyle = hexToRgba(meta.color, alpha * 0.56);
         ctx.fillRect(gx * GRID_CELL, gy * GRID_CELL, GRID_CELL, GRID_CELL);
 
-        // 局部概率峰值点闪烁粒子
-        if (val > 0.22 && ((gx * 37 + gy * 17) % 5 === 0)) {
-          const r = 1.6 + val * 2.2 * wave;
-          ctx.fillStyle = hexToRgba('#ffffff', alpha * 0.75);
+        if (val > 0.22 && (gx * 37 + gy * 17) % 5 === 0) {
+          const r = 1.6 + val * 2.3 * wave;
+          ctx.fillStyle = hexToRgba('#ffffff', alpha * 0.78);
           ctx.beginPath();
           ctx.arc(
             cx + Math.sin(t * 5 + gx) * 2.2,
@@ -235,15 +247,11 @@ export class BlueprintRenderer {
       }
     }
 
-    // 如果密室目标已经被概率云覆盖，在目标周围绘制醒目的“可坍缩锁定位相环”
+    // 目标锁定位相环
     for (const ent of world.entities) {
       if (ent.destroyed || ent.quantumGhostOnly) continue;
       if (!ent.remainingMaterials.includes(electron.spectrum)) continue;
-      const localPsi = world.collapseEngine.sampleMaxPsiAround(
-        ent.x,
-        ent.y,
-        ent.radius + 8
-      );
+      const localPsi = engine.sampleMaxPsiAround(ent.x, ent.y, ent.radius + 8);
       if (localPsi >= 0.09) {
         const pulse = 1 + Math.sin(t * 10) * 0.08;
         ctx.strokeStyle = meta.color;
@@ -260,22 +268,123 @@ export class BlueprintRenderer {
         ctx.fillText(
           `Ψ=${Math.round(localPsi * 100)}% [开启观测即可坍缩]`,
           ent.x,
-          ent.y - ent.radius - 20
+          ent.y - ent.radius - 22
         );
       }
     }
     ctx.restore();
   }
 
-  private drawDevice(dev: DeviceState, selected: boolean, t: number): void {
+  private drawDevice(
+    world: SimulationWorld,
+    dev: DeviceState,
+    selected: boolean,
+    t: number
+  ): void {
     const ctx = this.ctx;
     ctx.save();
     ctx.translate(dev.x, dev.y);
 
+    if (dev.kind === 'screen') {
+      // 光学遮蔽幕：垂直于 angleRad 的宽挡光板
+      ctx.rotate(dev.angleRad);
+      const half = dev.radius;
+
+      // 遮光主面板
+      ctx.fillStyle = '#1e293b';
+      ctx.strokeStyle = selected ? '#ffffff' : '#94a3b8';
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.roundRect(-6, -half, 12, half * 2, 4);
+      ctx.fill();
+      ctx.stroke();
+
+      // 阻光纹理
+      ctx.strokeStyle = 'rgba(226, 232, 240, 0.45)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(0, -half + 6);
+      ctx.lineTo(0, half - 6);
+      ctx.stroke();
+
+      // 法线朝向旋转手柄
+      if (!dev.fixed) {
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.6)';
+        ctx.beginPath();
+        ctx.moveTo(6, 0);
+        ctx.lineTo(36, 0);
+        ctx.stroke();
+
+        ctx.fillStyle = selected ? '#ffd600' : '#00e5ff';
+        ctx.beginPath();
+        ctx.arc(38, 0, 5.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+
+      ctx.save();
+      ctx.font = '600 10px Menlo, monospace';
+      ctx.fillStyle = '#cbd5e1';
+      ctx.textAlign = 'center';
+      ctx.fillText('光学遮蔽幕 (挡光)', dev.x, dev.y + 26);
+      ctx.restore();
+      return;
+    }
+
+    if (dev.kind === 'beacon') {
+      const obs = world.observers.find((o) => o.id === dev.linkedObserverId);
+      const active = Boolean(obs?.active);
+      const color = active ? '#7ee787' : '#64748b';
+
+      ctx.strokeStyle = selected ? '#ffffff' : hexToRgba(color, 0.45);
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, 22, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.fillStyle = '#0e1623';
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(0, 0, 14, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.rotate(dev.angleRad);
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(10, -6);
+      ctx.lineTo(20, 0);
+      ctx.lineTo(10, 6);
+      ctx.closePath();
+      ctx.fill();
+
+      // 旋转手柄
+      if (!dev.fixed) {
+        ctx.strokeStyle = hexToRgba(color, 0.55);
+        ctx.beginPath();
+        ctx.moveTo(20, 0);
+        ctx.lineTo(40, 0);
+        ctx.stroke();
+        ctx.fillStyle = selected ? '#ffd600' : '#7ee787';
+        ctx.beginPath();
+        ctx.arc(42, 0, 5.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+
+      ctx.save();
+      ctx.font = '600 10px Menlo, monospace';
+      ctx.fillStyle = color;
+      ctx.textAlign = 'center';
+      ctx.fillText(`便携信标 ${active ? '[开]' : '[关]'}`, dev.x, dev.y + 34);
+      ctx.restore();
+      return;
+    }
+
     const isDeflector = dev.kind === 'deflector';
     const baseColor = isDeflector ? '#38bdf8' : '#22d3ee';
 
-    // 作用力场半径圈
     const ringGrad = ctx.createRadialGradient(0, 0, 8, 0, 0, dev.radius);
     ringGrad.addColorStop(0, isDeflector ? 'rgba(56, 189, 248, 0.16)' : 'rgba(34, 211, 238, 0.22)');
     ringGrad.addColorStop(1, 'rgba(56, 189, 248, 0.01)');
@@ -293,10 +402,7 @@ export class BlueprintRenderer {
     ctx.setLineDash([]);
 
     if (isDeflector) {
-      // 超导磁偏转器：方向磁力线与旋转操控手柄
       ctx.rotate(dev.angleRad);
-
-      // 流线磁感箭头
       ctx.strokeStyle = 'rgba(56, 189, 248, 0.42)';
       ctx.lineWidth = 1.4;
       for (const offset of [-22, 0, 22]) {
@@ -306,7 +412,6 @@ export class BlueprintRenderer {
         ctx.stroke();
       }
 
-      // 中心六边形磁环
       ctx.fillStyle = '#0d1b2a';
       ctx.strokeStyle = selected ? '#ffffff' : '#38bdf8';
       ctx.lineWidth = 2.2;
@@ -315,7 +420,6 @@ export class BlueprintRenderer {
       ctx.fill();
       ctx.stroke();
 
-      // 导向主箭头
       ctx.strokeStyle = '#7dd3fc';
       ctx.fillStyle = '#e0f2fe';
       ctx.lineWidth = 2.5;
@@ -331,7 +435,6 @@ export class BlueprintRenderer {
       ctx.closePath();
       ctx.fill();
 
-      // 旋转拖动手柄圆点（可拖拽转向）
       if (!dev.fixed) {
         ctx.fillStyle = selected ? '#ffd600' : '#00e5ff';
         ctx.beginPath();
@@ -339,7 +442,6 @@ export class BlueprintRenderer {
         ctx.fill();
       }
     } else {
-      // 高压引雷针（向心脉冲波 + 尖端电极）
       const pulsePhase = (t * 1.4) % 1;
       const inRadius = dev.radius * (1 - pulsePhase);
       ctx.strokeStyle = hexToRgba('#00e5ff', pulsePhase * 0.42);
@@ -348,7 +450,6 @@ export class BlueprintRenderer {
       ctx.arc(0, 0, inRadius, 0, Math.PI * 2);
       ctx.stroke();
 
-      // 核心电极座
       const chargeGlow = dev.pulseTimer > 0 ? 12 : 0;
       ctx.shadowColor = '#00e5ff';
       ctx.shadowBlur = 10 + chargeGlow;
@@ -361,7 +462,6 @@ export class BlueprintRenderer {
       ctx.stroke();
       ctx.shadowBlur = 0;
 
-      // 闪电符号
       ctx.fillStyle = '#00e5ff';
       ctx.beginPath();
       ctx.moveTo(2, -9);
@@ -382,10 +482,9 @@ export class BlueprintRenderer {
     ctx.restore();
   }
 
-  private drawWall(wall: WallState, blueprintMode: boolean): void {
+  private drawWall(wall: WallState, blueprintMode: boolean, t: number): void {
     const ctx = this.ctx;
     if (wall.destroyed) {
-      // 已气化的钢门残留淡虚线框
       ctx.save();
       ctx.strokeStyle = 'rgba(255, 214, 0, 0.28)';
       ctx.setLineDash([4, 4]);
@@ -402,7 +501,6 @@ export class BlueprintRenderer {
       ctx.lineWidth = 1.5;
       ctx.strokeRect(wall.x, wall.y, wall.w, wall.h);
 
-      // 斜线结构纹理
       ctx.beginPath();
       ctx.rect(wall.x, wall.y, wall.w, wall.h);
       ctx.clip();
@@ -413,15 +511,35 @@ export class BlueprintRenderer {
         ctx.lineTo(wall.x + i - wall.h, wall.y + wall.h);
       }
       ctx.stroke();
+    } else if (wall.kind === 'metal_rail') {
+      // 导电金属导流壁：银青金属质感 + 表面流动微电流
+      ctx.fillStyle = '#142a3c';
+      ctx.fillRect(wall.x, wall.y, wall.w, wall.h);
+      ctx.strokeStyle = '#67e8f9';
+      ctx.lineWidth = 2.2;
+      ctx.strokeRect(wall.x, wall.y, wall.w, wall.h);
+
+      ctx.strokeStyle = 'rgba(165, 243, 252, 0.65)';
+      ctx.lineWidth = 1.4;
+      ctx.setLineDash([10, 12]);
+      ctx.lineDashOffset = -t * 50;
+      ctx.beginPath();
+      if (wall.w >= wall.h) {
+        ctx.moveTo(wall.x + 4, wall.y + wall.h * 0.5);
+        ctx.lineTo(wall.x + wall.w - 4, wall.y + wall.h * 0.5);
+      } else {
+        ctx.moveTo(wall.x + wall.w * 0.5, wall.y + 4);
+        ctx.lineTo(wall.x + wall.w * 0.5, wall.y + wall.h - 4);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
     } else if (wall.kind === 'glass') {
-      // 防弹玻璃：晶莹青蓝半透明，视觉上立刻暗示“挡球但透光”
       ctx.fillStyle = 'rgba(56, 189, 248, 0.24)';
       ctx.fillRect(wall.x, wall.y, wall.w, wall.h);
       ctx.strokeStyle = '#38bdf8';
       ctx.lineWidth = 1.8;
       ctx.strokeRect(wall.x, wall.y, wall.w, wall.h);
 
-      // 玻璃反光条纹
       ctx.strokeStyle = 'rgba(224, 242, 254, 0.55)';
       ctx.lineWidth = 1.2;
       ctx.beginPath();
@@ -431,14 +549,12 @@ export class BlueprintRenderer {
       }
       ctx.stroke();
     } else if (wall.kind === 'steel_door') {
-      // δ 钢制重门
       ctx.fillStyle = 'rgba(255, 214, 0, 0.16)';
       ctx.fillRect(wall.x, wall.y, wall.w, wall.h);
       ctx.strokeStyle = '#ffd600';
       ctx.lineWidth = 2;
       ctx.strokeRect(wall.x, wall.y, wall.w, wall.h);
 
-      // 门锁横纹
       ctx.strokeStyle = 'rgba(255, 214, 0, 0.45)';
       ctx.beginPath();
       for (let y = wall.y + 12; y < wall.y + wall.h; y += 14) {
@@ -455,7 +571,7 @@ export class BlueprintRenderer {
       ctx.fillStyle =
         wall.kind === 'steel_door'
           ? '#ffd600'
-          : wall.kind === 'glass'
+          : wall.kind === 'glass' || wall.kind === 'metal_rail'
           ? '#7dd3fc'
           : '#8ea1b8';
       ctx.textAlign = 'center';
@@ -472,11 +588,33 @@ export class BlueprintRenderer {
   ): void {
     const ctx = this.ctx;
 
-    // 量子蓝玫瑰特殊渲染：仅在完全无观测暗区悄然盛开，一照亮即消隐！
+    // 量子蓝玫瑰特殊渲染（含第 12 关压制敌方强光探头的量子纠缠丝线！）
     if (ent.quantumGhostOnly) {
-      const observed = world.isPointObserved(ent.x, ent.y);
-      if (observed) return;
-      this.drawQuantumRose(ent.x, ent.y, t);
+      if (!ent.ghostActive) return;
+
+      if (ent.suppressObserverId) {
+        const targetObs = world.observers.find((o) => o.id === ent.suppressObserverId);
+        if (targetObs) {
+          ctx.save();
+          ctx.strokeStyle = `rgba(56, 189, 248, ${0.5 + Math.sin(t * 6) * 0.25})`;
+          ctx.lineWidth = 1.8;
+          ctx.setLineDash([7, 5]);
+          ctx.lineDashOffset = -t * 38;
+          ctx.beginPath();
+          ctx.moveTo(ent.x, ent.y);
+          ctx.quadraticCurveTo(
+            (ent.x + targetObs.x) * 0.5,
+            Math.min(ent.y, targetObs.y) - 45,
+            targetObs.x,
+            targetObs.y
+          );
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.restore();
+        }
+      }
+
+      this.drawQuantumRose(ent.x, ent.y, ent.name, Boolean(ent.suppressObserverId), t);
       return;
     }
 
@@ -484,7 +622,6 @@ export class BlueprintRenderer {
     ctx.translate(ent.x, ent.y);
 
     if (ent.destroyed) {
-      // 已被选择性气化的空洞残影
       ctx.strokeStyle = 'rgba(148, 163, 184, 0.3)';
       ctx.setLineDash([3, 3]);
       ctx.beginPath();
@@ -499,10 +636,9 @@ export class BlueprintRenderer {
       return;
     }
 
-    // 蓝图模式下若为 β 易爆体，画出危险次生爆炸半径虚线圈
     if ((blueprintMode || ent.role === 'fuel_drum') && ent.blastRadius && ent.remainingMaterials.includes('beta')) {
-      ctx.strokeStyle = 'rgba(255, 87, 34, 0.22)';
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(255, 87, 34, 0.24)';
+      ctx.lineWidth = 1.1;
       ctx.setLineDash([4, 6]);
       ctx.beginPath();
       ctx.arc(0, 0, ent.blastRadius, 0, Math.PI * 2);
@@ -510,7 +646,6 @@ export class BlueprintRenderer {
       ctx.setLineDash([]);
     }
 
-    // 保护目标防护框
     if (ent.isProtected) {
       ctx.strokeStyle = 'rgba(126, 231, 135, 0.65)';
       ctx.lineWidth = 1.4;
@@ -521,7 +656,6 @@ export class BlueprintRenderer {
       ctx.setLineDash([]);
     }
 
-    // 异频无害穿透光环反馈
     if (ent.phasePassTimer > 0) {
       ctx.strokeStyle = `rgba(255, 255, 255, ${ent.phasePassTimer})`;
       ctx.lineWidth = 2;
@@ -530,7 +664,6 @@ export class BlueprintRenderer {
       ctx.stroke();
     }
 
-    // 主体几何形态（不同角色清晰可辨）
     const primarySpec: SpectrumType = ent.remainingMaterials[0] ?? 'alpha';
     const strokeColor = ent.disabled
       ? '#64748b'
@@ -548,22 +681,34 @@ export class BlueprintRenderer {
       ctx.roundRect(-r, -r, r * 2, r * 2, 6);
       ctx.fill();
       ctx.stroke();
-      // 芯片电路装饰
       ctx.strokeStyle = hexToRgba(strokeColor, 0.45);
       ctx.lineWidth = 1.2;
       ctx.strokeRect(-r * 0.55, -r * 0.55, r * 1.1, r * 1.1);
-      // 呼吸指示灯
       ctx.fillStyle = strokeColor;
       ctx.beginPath();
       ctx.arc(0, 0, 4 + Math.sin(t * 5) * 1.2, 0, Math.PI * 2);
       ctx.fill();
+    } else if (ent.role === 'camera_node') {
+      ctx.beginPath();
+      ctx.arc(0, 0, ent.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      // 镜头红眼
+      ctx.fillStyle = '#ff5722';
+      ctx.beginPath();
+      ctx.arc(0, 0, 6.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#00e5ff';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(0, 0, 12, 0, Math.PI * 2);
+      ctx.stroke();
     } else if (ent.role === 'missile_truck') {
       const r = ent.radius;
       ctx.beginPath();
       ctx.roundRect(-r * 1.1, -r * 0.78, r * 2.2, r * 1.56, 7);
       ctx.fill();
       ctx.stroke();
-      // 导弹发射架线条
       ctx.strokeStyle = ent.disabled ? '#475569' : '#cbd5e1';
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -594,12 +739,12 @@ export class BlueprintRenderer {
       ctx.textBaseline = 'middle';
       ctx.fillText('DATA', 0, 1);
     } else {
-      // scientist 等人员图标
+      // scientist / commander
       ctx.beginPath();
       ctx.arc(0, 0, ent.radius, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = '#e2e8f0';
+      ctx.fillStyle = ent.role === 'commander' ? '#e879f9' : '#e2e8f0';
       ctx.beginPath();
       ctx.arc(0, -4, 4.5, 0, Math.PI * 2);
       ctx.fill();
@@ -608,7 +753,6 @@ export class BlueprintRenderer {
       ctx.fill();
     }
 
-    // 实体名称标签
     ctx.font = '600 11px -apple-system, sans-serif';
     ctx.fillStyle = ent.disabled ? '#7ee787' : '#e2e8f0';
     ctx.textAlign = 'center';
@@ -616,7 +760,6 @@ export class BlueprintRenderer {
     const statusSuffix = ent.disabled ? ' [已瘫痪]' : ent.isProtected ? ' [保护]' : '';
     ctx.fillText(`${ent.name}${statusSuffix}`, 0, ent.radius + 17);
 
-    // 顶部材质频段徽章组（如 [δ][α][β]）
     const mats = ent.remainingMaterials;
     const badgeW = 20;
     const gap = 4;
@@ -645,20 +788,25 @@ export class BlueprintRenderer {
     ctx.restore();
   }
 
-  private drawQuantumRose(x: number, y: number, t: number): void {
+  private drawQuantumRose(
+    x: number,
+    y: number,
+    label: string,
+    suppressing: boolean,
+    t: number
+  ): void {
     const ctx = this.ctx;
     ctx.save();
     ctx.translate(x, y);
-    const shimmer = 0.45 + 0.35 * Math.sin(t * 2.8);
+    const shimmer = 0.55 + 0.35 * Math.sin(t * 3.0);
     ctx.strokeStyle = `rgba(56, 189, 248, ${shimmer})`;
     ctx.shadowColor = '#00e5ff';
-    ctx.shadowBlur = 12;
-    ctx.lineWidth = 1.3;
+    ctx.shadowBlur = suppressing ? 18 : 12;
+    ctx.lineWidth = 1.5;
 
-    // 极坐标四叶量子蓝玫瑰线框
     ctx.beginPath();
     for (let a = 0; a <= Math.PI * 2; a += 0.08) {
-      const r = 13 * Math.cos(2 * a + t * 0.4);
+      const r = 14 * Math.cos(2 * a + t * 0.45);
       const px = r * Math.cos(a);
       const py = r * Math.sin(a);
       if (a === 0) ctx.moveTo(px, py);
@@ -668,10 +816,10 @@ export class BlueprintRenderer {
     ctx.stroke();
     ctx.shadowBlur = 0;
 
-    ctx.font = '600 9.5px Menlo, monospace';
-    ctx.fillStyle = `rgba(125, 211, 252, ${shimmer + 0.15})`;
+    ctx.font = '600 10px Menlo, monospace';
+    ctx.fillStyle = `rgba(125, 211, 252, ${Math.min(1, shimmer + 0.15)})`;
     ctx.textAlign = 'center';
-    ctx.fillText('Ψ 蓝玫瑰 (无观测态)', 0, 24);
+    ctx.fillText(suppressing ? `${label} [压制敌灯中]` : `${label} (无观测态)`, 0, 26);
     ctx.restore();
   }
 
@@ -681,14 +829,18 @@ export class BlueprintRenderer {
     ctx.translate(obs.x, obs.y);
 
     const isPlayer = obs.owner === 'player';
-    const color = isPlayer
+    const disabled = obs.permanentlyDisabled || obs.suppressedByGhost;
+    const color = disabled
+      ? '#64748b'
+      : isPlayer
       ? obs.active
         ? '#7ee787'
         : '#64748b'
       : '#ff6b57';
 
-    // 点击提示波纹（针对窗外可控信标）
-    if (isPlayer && obs.id !== 'obs-emitter') {
+    const isEmitterLamp = obs.id.startsWith('obs-emitter');
+
+    if (isPlayer && !isEmitterLamp) {
       ctx.strokeStyle = hexToRgba(color, 0.35 + Math.sin(t * 4) * 0.15);
       ctx.lineWidth = 1.4;
       ctx.beginPath();
@@ -696,7 +848,6 @@ export class BlueprintRenderer {
       ctx.stroke();
     }
 
-    // 底座
     ctx.fillStyle = '#0e1623';
     ctx.strokeStyle = color;
     ctx.lineWidth = 2;
@@ -705,7 +856,6 @@ export class BlueprintRenderer {
     ctx.fill();
     ctx.stroke();
 
-    // 指向灯头
     ctx.save();
     ctx.rotate(obs.angleRad);
     ctx.fillStyle = color;
@@ -717,12 +867,21 @@ export class BlueprintRenderer {
     ctx.fill();
     ctx.restore();
 
-    // 标签
-    if (obs.id !== 'obs-emitter') {
+    if (!isEmitterLamp) {
       ctx.font = '600 10.5px Menlo, monospace';
-      ctx.fillStyle = color;
+      ctx.fillStyle = obs.suppressedByGhost ? '#38bdf8' : color;
       ctx.textAlign = 'center';
-      const stateTag = isPlayer ? (obs.active ? '[点击关闭]' : '[点击开启]') : '[巡逻扫描]';
+      const stateTag = obs.permanentlyDisabled
+        ? '[已摧毁]'
+        : obs.suppressedByGhost
+        ? '[被量子态压制]'
+        : isPlayer
+        ? obs.active
+          ? '[点击关闭]'
+          : '[点击开启]'
+        : obs.sweep
+        ? '[巡逻扫描]'
+        : '[常亮锁定]';
       ctx.fillText(`${obs.name} ${stateTag}`, 0, obs.y > WORLD_HEIGHT - 120 ? 32 : -18);
     }
 
@@ -733,8 +892,7 @@ export class BlueprintRenderer {
     const ctx = this.ctx;
     const specMeta = SPECTRUM_META[world.selectedSpectrum];
 
-    // 未发射或暂停时，画出前瞻预测轨道虚线！
-    if (!world.electron || !world.electron.alive || world.paused) {
+    if (world.activeElectronCount < world.maxConcurrentElectrons || world.paused) {
       const startX = world.emitterX + Math.cos(world.emitterAngle) * 26;
       const startY = world.emitterY + Math.sin(world.emitterAngle) * 26;
       const pred = predictTrajectory(
@@ -745,7 +903,7 @@ export class BlueprintRenderer {
         world.devices,
         world.walls,
         (x, y) => world.isPointObserved(x, y),
-        3.6
+        4.2
       );
 
       if (pred.points.length > 1) {
@@ -762,7 +920,6 @@ export class BlueprintRenderer {
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // 标注进入盲区或撞墙落点
         if (pred.enteredBlindZoneAt) {
           const p = pred.enteredBlindZoneAt;
           ctx.strokeStyle = specMeta.color;
@@ -789,11 +946,9 @@ export class BlueprintRenderer {
       }
     }
 
-    // 绘制雷球发生器本体
     ctx.save();
     ctx.translate(world.emitterX, world.emitterY);
 
-    // 旋转底座
     ctx.fillStyle = '#0d1522';
     ctx.strokeStyle = specMeta.color;
     ctx.lineWidth = 2.4;
@@ -805,14 +960,12 @@ export class BlueprintRenderer {
     ctx.stroke();
     ctx.shadowBlur = 0;
 
-    // 发射炮口指针
     ctx.rotate(world.emitterAngle);
     ctx.fillStyle = specMeta.color;
     ctx.beginPath();
     ctx.roundRect(10, -5, 20, 10, 3);
     ctx.fill();
 
-    // 瞄准拉动手柄提示
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
     ctx.arc(38, 0, 4.5, 0, Math.PI * 2);
@@ -834,7 +987,6 @@ export class BlueprintRenderer {
 
     ctx.save();
 
-    // 等离子拖尾
     if (e.trail.length > 1) {
       for (let i = 1; i < e.trail.length; i++) {
         const ratio = i / e.trail.length;
@@ -847,11 +999,8 @@ export class BlueprintRenderer {
       }
     }
 
-    // 外层辉光球体
-    const jitterX = Math.sin(t * 47) * 1.1;
-    const jitterY = Math.cos(t * 53) * 1.1;
-    const cx = e.x + jitterX;
-    const cy = e.y + jitterY;
+    const cx = e.x + Math.sin(t * 47 + e.id) * 1.1;
+    const cy = e.y + Math.cos(t * 53 + e.id) * 1.1;
 
     const glowGrad = ctx.createRadialGradient(cx, cy, 2, cx, cy, 26);
     glowGrad.addColorStop(0, '#ffffff');
@@ -862,21 +1011,17 @@ export class BlueprintRenderer {
     ctx.arc(cx, cy, 26, 0, Math.PI * 2);
     ctx.fill();
 
-    // 高频锯齿微电弧
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 1.4;
     for (let k = 0; k < 3; k++) {
-      const a = t * 14 + k * 2.1;
-      const r1 = 8;
-      const r2 = 17;
+      const a = t * 14 + k * 2.1 + e.id;
       ctx.beginPath();
-      ctx.moveTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
-      ctx.lineTo(cx + Math.cos(a + 0.3) * ((r1 + r2) * 0.5), cy + Math.sin(a + 0.3) * ((r1 + r2) * 0.5));
-      ctx.lineTo(cx + Math.cos(a - 0.15) * r2, cy + Math.sin(a - 0.15) * r2);
+      ctx.moveTo(cx + Math.cos(a) * 8, cy + Math.sin(a) * 8);
+      ctx.lineTo(cx + Math.cos(a + 0.3) * 13, cy + Math.sin(a + 0.3) * 13);
+      ctx.lineTo(cx + Math.cos(a - 0.15) * 17, cy + Math.sin(a - 0.15) * 17);
       ctx.stroke();
     }
 
-    // 核心白球
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
     ctx.arc(cx, cy, 6.2, 0, Math.PI * 2);
@@ -888,29 +1033,46 @@ export class BlueprintRenderer {
   private drawPlacementGhost(kind: DeviceKind, x: number, y: number): void {
     const ctx = this.ctx;
     ctx.save();
-    ctx.globalAlpha = 0.6;
-    const r = kind === 'deflector' ? 76 : 108;
-    ctx.strokeStyle = '#00e5ff';
-    ctx.setLineDash([5, 5]);
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
+    ctx.globalAlpha = 0.65;
 
-    ctx.fillStyle = 'rgba(0, 229, 255, 0.25)';
-    ctx.beginPath();
-    ctx.arc(x, y, 16, 0, Math.PI * 2);
-    ctx.fill();
+    const nameMap: Record<DeviceKind, string> = {
+      deflector: '超导磁偏转器',
+      attractor: '高压引雷针',
+      screen: '光学遮蔽幕',
+      beacon: '便携观测信标',
+    };
+
+    if (kind === 'screen') {
+      ctx.fillStyle = '#475569';
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 2;
+      ctx.fillRect(x - 56, y - 6, 112, 12);
+      ctx.strokeRect(x - 56, y - 6, 112, 12);
+    } else if (kind === 'beacon') {
+      ctx.strokeStyle = '#7ee787';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(x, y, 16, 0, Math.PI * 2);
+      ctx.stroke();
+    } else {
+      const r = kind === 'deflector' ? 76 : 108;
+      ctx.strokeStyle = '#00e5ff';
+      ctx.setLineDash([5, 5]);
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(0, 229, 255, 0.25)';
+      ctx.beginPath();
+      ctx.arc(x, y, 16, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     ctx.font = '600 11px Menlo, monospace';
     ctx.fillStyle = '#e0f2fe';
     ctx.textAlign = 'center';
-    ctx.fillText(
-      `点击放置 ${kind === 'deflector' ? '超导磁偏转器' : '高压引雷针'} (Esc取消)`,
-      x,
-      y - 24
-    );
+    ctx.fillText(`点击放置 ${nameMap[kind]} (Esc取消)`, x, y - 24);
     ctx.restore();
   }
 
@@ -920,8 +1082,36 @@ export class BlueprintRenderer {
     const inv = 1 - p;
 
     ctx.save();
-    if (fx.kind === 'collapse_implosion') {
-      // 由大向小剧烈内爆收束环！直观展示“漫天概率云坍缩为一点”
+    if (fx.kind === 'macro_fusion') {
+      // 宏聚变全屏微闪 + 巨型双色共振波环
+      if (p < 0.22) {
+        ctx.fillStyle = `rgba(220, 248, 255, ${(0.22 - p) * 1.4})`;
+        ctx.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+      }
+
+      const r = fx.radius * Math.pow(p, 0.42);
+      const grad = ctx.createRadialGradient(fx.x, fx.y, 8, fx.x, fx.y, r);
+      grad.addColorStop(0, `rgba(255, 255, 255, ${inv * 0.7})`);
+      grad.addColorStop(0.5, hexToRgba(fx.color, inv * 0.32));
+      grad.addColorStop(0.85, hexToRgba(fx.secondaryColor ?? '#ffffff', inv * 0.45));
+      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(fx.x, fx.y, r, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = hexToRgba('#ffffff', inv * 0.9);
+      ctx.lineWidth = 4 * inv + 1;
+      ctx.beginPath();
+      ctx.arc(fx.x, fx.y, r, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.strokeStyle = hexToRgba(fx.color, inv * 0.75);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(fx.x, fx.y, r * 0.72, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (fx.kind === 'collapse_implosion') {
       const r = fx.radius * inv * inv + 6;
       ctx.strokeStyle = hexToRgba(fx.color, 0.9 * inv);
       ctx.lineWidth = 3.5;
@@ -929,7 +1119,6 @@ export class BlueprintRenderer {
       ctx.arc(fx.x, fx.y, r, 0, Math.PI * 2);
       ctx.stroke();
 
-      // 闪光十字星
       ctx.strokeStyle = `rgba(255, 255, 255, ${inv})`;
       ctx.lineWidth = 2;
       const arm = 26 * inv;
@@ -980,10 +1169,10 @@ export class BlueprintRenderer {
     }
 
     if (fx.label) {
-      ctx.font = '700 11.5px Menlo, monospace';
-      ctx.fillStyle = hexToRgba(fx.color, Math.min(1, inv * 1.4));
+      ctx.font = '700 12px Menlo, monospace';
+      ctx.fillStyle = hexToRgba(fx.color, Math.min(1, inv * 1.45));
       ctx.textAlign = 'center';
-      ctx.fillText(fx.label, fx.x, fx.y - 26 - p * 18);
+      ctx.fillText(fx.label, fx.x, fx.y - 26 - p * 22);
     }
 
     ctx.restore();
@@ -996,7 +1185,6 @@ export class BlueprintRenderer {
     ctx.lineWidth = 1.5;
     const len = 18;
     const m = 10;
-    // 四角 L 形取景框
     const corners: [number, number, number, number][] = [
       [m, m, 1, 1],
       [WORLD_WIDTH - m, m, -1, 1],
@@ -1011,7 +1199,6 @@ export class BlueprintRenderer {
       ctx.stroke();
     }
 
-    // 右下角时钟
     ctx.font = '500 10.5px Menlo, monospace';
     ctx.fillStyle = 'rgba(142, 161, 184, 0.5)';
     ctx.textAlign = 'right';

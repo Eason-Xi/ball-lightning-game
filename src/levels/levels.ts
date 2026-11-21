@@ -2,49 +2,28 @@ import { LevelSpec } from '../sim/types';
 
 export const LEVELS: LevelSpec[] = [
   // =========================================================================
-  // LEVEL 01: 《空泡与偏转》—— 基础电磁场导引与引雷针能量续命
+  // 第一幕：泰山与空泡实验室（EXP-01 ~ EXP-03）
   // =========================================================================
   {
     id: 'lvl-01',
+    act: 1,
+    actTitle: '第一幕 · 泰山与空泡实验室',
     code: 'EXP-01',
     title: '01 // 空泡与偏转',
     brief:
-      '球状闪电并非直线弹道，其寿命有限且易受导体与磁场牵引。利用超导磁偏转器绕过混凝土隔墙，并借由下方高压引雷针过载续能，摧毁右侧目标服务器。',
-    hint: '操作提示：在底部选中【磁偏转器】，点击空白处放置 2 个偏转器（拖拽箭头可旋转方向），引导雷球先经过底部【引雷针】补能，再折向右上命中目标主机。',
+      '球状闪电并非直线弹道，其激发态寿命有限且受磁场牵引。利用超导磁偏转器绕过混凝土隔墙，并经下方高压引雷针过载续能，摧毁右侧目标主机。',
+    hint: '底部选中【磁偏转器】，在画布空白处放置 2 个偏转器（拖拽外侧圆点调箭头），引导雷球先经过下方【高压引雷针】补能，再折向右上命中主机。',
+    archive:
+      '【1998.08 泰山气象站记录】我们一直在用大气电学解释球状闪电，直到高速摄影机拍下它在强磁场中的诡异折转——它不是电离空气，而是一个处于激发态的宏观基本粒子。',
     ammo: 3,
     allowedSpectrums: ['alpha'],
     defaultSpectrum: 'alpha',
-    inventory: {
-      deflector: 2,
-      attractor: 0,
-    },
+    inventory: { deflector: 2, attractor: 0 },
     ambientObserved: true,
-    emitter: {
-      x: 98,
-      y: 210,
-      angleRad: 0,
-      hasLocalLight: false,
-    },
+    emitter: { x: 98, y: 210, angleRad: 0, hasLocalLight: false },
     walls: [
-      // 中央主混凝土隔墙（贴顶封死，强制从下方绕行）
-      {
-        id: 'w1-mid',
-        x: 355,
-        y: 0,
-        w: 32,
-        h: 356,
-        kind: 'concrete',
-        label: '混凝土隔墙',
-      },
-      // 右上导流护墙（构成实验靶道空间美感）
-      {
-        id: 'w1-top-guard',
-        x: 640,
-        y: 0,
-        w: 24,
-        h: 110,
-        kind: 'concrete',
-      },
+      { id: 'w1-mid', x: 355, y: 0, w: 32, h: 356, kind: 'concrete', label: '混凝土隔墙' },
+      { id: 'w1-top', x: 640, y: 0, w: 24, h: 110, kind: 'concrete' },
     ],
     entities: [
       {
@@ -59,7 +38,6 @@ export const LEVELS: LevelSpec[] = [
       },
     ],
     devices: [
-      // 预设底部高压引雷针（提供向心牵引与 +38% 能量续命）
       {
         id: 'attr-fixed-01',
         kind: 'attractor',
@@ -82,52 +60,169 @@ export const LEVELS: LevelSpec[] = [
     ],
   },
 
-  // =========================================================================
-  // LEVEL 02: 《外科手术》—— 四元选择性频谱共振与零附带损伤
-  // =========================================================================
   {
     id: 'lvl-02',
+    act: 1,
+    actTitle: '第一幕 · 泰山与空泡实验室',
     code: 'EXP-02',
-    title: '02 // 外科手术',
+    title: '02 // 金属导流壁',
     brief:
-      '球状闪电仅与同频段物质发生共振毁灭，对其余物质则如幽灵般无害穿透。穿过前方的易爆燃料桶（严禁引爆伤及黑匣子），先融化钢制重门，再精准烧毁堡垒内导弹车的火控芯片。',
-    hint: '操作提示：仅 2 颗宏电子！第 1 发切至 [3] δ 金属频段直射，无害穿透燃料桶并气化钢制重门；第 2 发切至 [1] α 硅基频段直射，瘫痪导弹车火控芯片而不触发弹药殉爆。',
+      '经典态球状闪电接触导电金属壁（银青轨道）时不会碎裂，而是因镜像电磁效应转为沿金属表面贴壁滑行。借由上方导流壁越过障碍，再偏转向下命中主机。',
+    hint: '拖拽【雷球发生器】向上瞄准上方银青色【金属导流壁】，球体将沿壁面水平滑行至右侧出口；在右侧出口放置 1 个【磁偏转器】向下导向引雷针与主机。',
+    archive:
+      '【1999.03 空泡激发实验室】它像一团有生命的幽蓝水银，沿着实验室顶棚的镀锌风管悄无声息地滑行了十二米，在管道尽头突然坠落，把那台示波器的主板烧成了灰。',
+    ammo: 3,
+    allowedSpectrums: ['alpha'],
+    defaultSpectrum: 'alpha',
+    inventory: { deflector: 1, attractor: 0 },
+    ambientObserved: true,
+    emitter: { x: 105, y: 455, angleRad: -0.78, hasLocalLight: false },
+    walls: [
+      // 上方导电金属导流壁（贴壁水平滑行）
+      {
+        id: 'w2-rail',
+        x: 230,
+        y: 122,
+        w: 405,
+        h: 20,
+        kind: 'metal_rail',
+        label: '导电金属导流壁 (贴壁滑行)',
+      },
+      // 中央阻隔混凝土墙
+      { id: 'w2-block', x: 255, y: 268, w: 335, h: 28, kind: 'concrete', label: '混凝土隔断' },
+      { id: 'w2-left', x: 255, y: 296, w: 28, h: 304, kind: 'concrete' },
+    ],
+    entities: [
+      {
+        id: 'srv-02',
+        name: '死角采集终端',
+        role: 'server',
+        x: 705,
+        y: 470,
+        radius: 26,
+        materials: ['alpha'],
+        requiredDestroyLayers: ['alpha'],
+      },
+    ],
+    devices: [
+      {
+        id: 'attr-fixed-02',
+        kind: 'attractor',
+        x: 705,
+        y: 300,
+        angleRad: 0,
+        radius: 108,
+        fixed: true,
+      },
+    ],
+    observers: [],
+    objectives: [
+      {
+        id: 'obj-02',
+        text: '借由金属导流壁与偏转器摧毁死角采集终端',
+        kind: 'destroy_layer',
+        entityId: 'srv-02',
+        layer: 'alpha',
+      },
+    ],
+  },
+
+  {
+    id: 'lvl-03',
+    act: 1,
+    actTitle: '第一幕 · 泰山与空泡实验室',
+    code: 'EXP-03',
+    title: '03 // 双级磁透镜',
+    brief:
+      '超长 S 型实验靶道远远超出了宏电子的单次激发寿命。串联两根高压引雷针构筑电磁接力轨道，让雷球两次过载续命并穿越双重隔墙命中右下角靶心。',
+    hint: '共 3 个【磁偏转器】：第 1 个向下送入左下引雷针；第 2 个在右下折向右上引雷针；第 3 个在右上转向右下目标。观察时停虚线可精确对准！',
+    archive:
+      '【1999.11 619 磁约束测试】单颗激发态宏电子在大气中的半衰期极短，但只要周期性提供高压电离补能，我们就能让它在千米级试验场上精准飞行。',
+    ammo: 3,
+    allowedSpectrums: ['alpha'],
+    defaultSpectrum: 'alpha',
+    inventory: { deflector: 3, attractor: 0 },
+    ambientObserved: true,
+    emitter: { x: 86, y: 138, angleRad: 0, hasLocalLight: false },
+    walls: [
+      { id: 'w3-a', x: 286, y: 0, w: 28, h: 350, kind: 'concrete', label: 'A区隔墙' },
+      { id: 'w3-b', x: 562, y: 268, w: 28, h: 332, kind: 'concrete', label: 'B区隔墙' },
+    ],
+    entities: [
+      {
+        id: 'srv-03',
+        name: '深层靶场主机',
+        role: 'server',
+        x: 838,
+        y: 455,
+        radius: 26,
+        materials: ['alpha'],
+        requiredDestroyLayers: ['alpha'],
+      },
+    ],
+    devices: [
+      {
+        id: 'attr-fixed-03a',
+        kind: 'attractor',
+        x: 300,
+        y: 455,
+        angleRad: 0,
+        radius: 108,
+        fixed: true,
+      },
+      {
+        id: 'attr-fixed-03b',
+        kind: 'attractor',
+        x: 576,
+        y: 176,
+        angleRad: 0,
+        radius: 108,
+        fixed: true,
+      },
+    ],
+    observers: [],
+    objectives: [
+      {
+        id: 'obj-03',
+        text: '经双重高压引雷针续能摧毁深层靶场主机',
+        kind: 'destroy_layer',
+        entityId: 'srv-03',
+        layer: 'alpha',
+      },
+    ],
+  },
+
+  // =========================================================================
+  // 第二幕：619 武器化靶场（EXP-04 ~ EXP-06）
+  // =========================================================================
+  {
+    id: 'lvl-04',
+    act: 2,
+    actTitle: '第二幕 · 619 武器化靶场',
+    code: 'EXP-04',
+    title: '04 // 外科手术',
+    brief:
+      '球状闪电仅与同频段物质共振，其余物质则如幽灵般无害穿透。穿过前方的易爆燃料桶（严禁引爆伤及黑匣子），先融化钢制重门，再烧毁堡垒内导弹车的火控芯片。',
+    hint: '仅 2 颗宏电子！第 1 发切至 [3] δ 金属频段直射，无害穿透燃料桶气化钢门；第 2 发切至 [1] α 硅基频段直射，精准瘫痪导弹车火控而不引爆弹药舱。',
+    archive:
+      '【2000.06 新概念武器研究组】常规武器靠动能与冲击波无差别杀伤；而宏电子武器像一把只对特定原子键生效的手术刀——你甚至可以在不烫伤士兵的情况下气化他弹匣里的火药。',
     ammo: 2,
     allowedSpectrums: ['alpha', 'beta', 'delta'],
     defaultSpectrum: 'alpha',
-    inventory: {
-      deflector: 1,
-      attractor: 0,
-    },
+    inventory: { deflector: 1, attractor: 0 },
     ambientObserved: true,
-    emitter: {
-      x: 92,
-      y: 300,
-      angleRad: 0,
-      hasLocalLight: false,
-    },
+    emitter: { x: 92, y: 300, angleRad: 0, hasLocalLight: false },
     walls: [
-      // 堡垒围墙
-      { id: 'w2-top', x: 500, y: 120, w: 356, h: 24, kind: 'concrete' },
-      { id: 'w2-bot', x: 500, y: 456, w: 356, h: 24, kind: 'concrete' },
-      { id: 'w2-right', x: 832, y: 120, w: 24, h: 360, kind: 'concrete' },
-      { id: 'w2-left-top', x: 500, y: 144, w: 24, h: 106, kind: 'concrete' },
-      { id: 'w2-left-bot', x: 500, y: 350, w: 24, h: 106, kind: 'concrete' },
-      // 唯一入口：δ 钢制重门
-      {
-        id: 'w2-door',
-        x: 500,
-        y: 250,
-        w: 24,
-        h: 100,
-        kind: 'steel_door',
-        label: '钢制重门 [δ]',
-      },
+      { id: 'w4-top', x: 500, y: 120, w: 356, h: 24, kind: 'concrete' },
+      { id: 'w4-bot', x: 500, y: 456, w: 356, h: 24, kind: 'concrete' },
+      { id: 'w4-right', x: 832, y: 120, w: 24, h: 360, kind: 'concrete' },
+      { id: 'w4-lt', x: 500, y: 144, w: 24, h: 106, kind: 'concrete' },
+      { id: 'w4-lb', x: 500, y: 350, w: 24, h: 106, kind: 'concrete' },
+      { id: 'w4-door', x: 500, y: 250, w: 24, h: 100, kind: 'steel_door', label: '钢制重门 [δ]' },
     ],
     entities: [
-      // 挡路的高爆燃料桶（β），紧邻受保护的黑匣子
       {
-        id: 'fuel-01',
+        id: 'fuel-04a',
         name: '高爆燃料桶 A',
         role: 'fuel_drum',
         x: 285,
@@ -137,7 +232,7 @@ export const LEVELS: LevelSpec[] = [
         blastRadius: 112,
       },
       {
-        id: 'fuel-02',
+        id: 'fuel-04b',
         name: '高爆燃料桶 B',
         role: 'fuel_drum',
         x: 285,
@@ -146,9 +241,8 @@ export const LEVELS: LevelSpec[] = [
         materials: ['beta'],
         blastRadius: 112,
       },
-      // 受保护的机密黑匣子（α），位于油桶爆炸半径 112px 之内
       {
-        id: 'blackbox-01',
+        id: 'blackbox-04',
         name: '机密黑匣子',
         role: 'blackbox',
         x: 285,
@@ -157,9 +251,8 @@ export const LEVELS: LevelSpec[] = [
         materials: ['alpha'],
         isProtected: true,
       },
-      // 堡垒内的复合目标导弹车（δ装甲 + α火控 + β弹药舱）
       {
-        id: 'missile-01',
+        id: 'missile-04',
         name: '复合装甲导弹车',
         role: 'missile_truck',
         x: 716,
@@ -169,9 +262,8 @@ export const LEVELS: LevelSpec[] = [
         requiredDestroyLayers: ['alpha'],
         blastRadius: 115,
       },
-      // 堡垒内紧邻导弹车的受困科研人员（γ），若误用 β 引爆导弹车会波及伤亡
       {
-        id: 'sci-01',
+        id: 'sci-04',
         name: '受困科研人员',
         role: 'scientist',
         x: 716,
@@ -185,80 +277,207 @@ export const LEVELS: LevelSpec[] = [
     observers: [],
     objectives: [
       {
-        id: 'obj-2-1',
+        id: 'obj-4-1',
         text: '仅烧毁导弹车的 α 火控芯片使其瘫痪',
         kind: 'destroy_layer',
-        entityId: 'missile-01',
+        entityId: 'missile-04',
         layer: 'alpha',
       },
+      { id: 'obj-4-2', text: '保护机密黑匣子毫发无损', kind: 'protect', entityId: 'blackbox-04' },
+      { id: 'obj-4-3', text: '保护堡垒内的科研人员安全', kind: 'protect', entityId: 'sci-04' },
+    ],
+  },
+
+  {
+    id: 'lvl-05',
+    act: 2,
+    actTitle: '第二幕 · 619 武器化靶场',
+    code: 'EXP-05',
+    title: '05 // 链式殉爆',
+    brief:
+      '目标主机藏身于厚混凝土直角掩体之后，仅剩 1 发宏电子且无任何偏转装置。逆向运用 β 频段的次生爆轰效应，点燃燃料桶链条隔墙摧毁死角目标。',
+    hint: '按 [Tab] 查看燃料桶的橙色爆炸半径圈！切换至 [2] β 含能频段直射左侧第 1 个燃料桶，触发三连殉爆将热浪传递至掩体后的目标主机。',
+    archive:
+      '【2000.11 大漠实战演练】当敌方把指挥主机埋进无死角掩体，单靠硅基共振鞭长莫及。林云提醒我们：他们忘了掩体门口那排没来得及转移的航空煤油桶。',
+    ammo: 1,
+    allowedSpectrums: ['alpha', 'beta'],
+    defaultSpectrum: 'alpha',
+    inventory: { deflector: 0, attractor: 0 },
+    ambientObserved: true,
+    emitter: { x: 110, y: 310, angleRad: 0, hasLocalLight: false },
+    walls: [
+      // 挡在目标主机前方的厚实直角掩体（挡住直线发射）
+      { id: 'w5-front', x: 560, y: 185, w: 28, h: 170, kind: 'concrete', label: '防弹掩体' },
+      { id: 'w5-top', x: 560, y: 185, w: 210, h: 24, kind: 'concrete' },
+      { id: 'w5-right', x: 746, y: 185, w: 24, h: 220, kind: 'concrete' },
+    ],
+    entities: [
       {
-        id: 'obj-2-2',
-        text: '保护机密黑匣子毫发无损',
-        kind: 'protect',
-        entityId: 'blackbox-01',
+        id: 'fuel-05a',
+        name: '燃料桶 #1',
+        role: 'fuel_drum',
+        x: 340,
+        y: 310,
+        radius: 21,
+        materials: ['beta'],
+        blastRadius: 112,
       },
       {
-        id: 'obj-2-3',
-        text: '保护堡垒内的科研人员安全',
-        kind: 'protect',
-        entityId: 'sci-01',
+        id: 'fuel-05b',
+        name: '燃料桶 #2',
+        role: 'fuel_drum',
+        x: 438,
+        y: 310,
+        radius: 21,
+        materials: ['beta'],
+        blastRadius: 112,
       },
+      {
+        id: 'fuel-05c',
+        name: '燃料桶 #3',
+        role: 'fuel_drum',
+        x: 525,
+        y: 365,
+        radius: 21,
+        materials: ['beta'],
+        blastRadius: 118,
+      },
+      {
+        id: 'srv-05',
+        name: '掩体核心主机',
+        role: 'server',
+        x: 642,
+        y: 315,
+        radius: 26,
+        materials: ['alpha'],
+        requiredDestroyLayers: ['alpha'],
+      },
+      {
+        id: 'blackbox-05',
+        name: '远端黑匣子',
+        role: 'blackbox',
+        x: 340,
+        y: 130,
+        radius: 20,
+        materials: ['alpha'],
+        isProtected: true,
+      },
+    ],
+    devices: [],
+    observers: [],
+    objectives: [
+      {
+        id: 'obj-5-1',
+        text: '引爆燃料链条摧毁掩体核心主机',
+        kind: 'destroy_layer',
+        entityId: 'srv-05',
+        layer: 'alpha',
+      },
+      { id: 'obj-5-2', text: '保全远端黑匣子', kind: 'protect', entityId: 'blackbox-05' },
+    ],
+  },
+
+  {
+    id: 'lvl-06',
+    act: 2,
+    actTitle: '第二幕 · 619 武器化靶场',
+    code: 'EXP-06',
+    title: '06 // 伦理红线',
+    brief:
+      '敌方中枢指令员正站在我方必须完好保全的机密服务器与高危燃料罐之间。解锁全部四元频谱——唯有冷酷的 γ 碳基频段能在不触碰任何设备的前提下将其精准清除。',
+    hint: '切换至 [4] γ 碳基有机频段直接发射！球状闪电将幽紫色无害穿透前方受保护的机密主机，精确气化目标而保留现场全部器物。',
+    archive:
+      '【2001.04 绝密伦理备忘录】那个雨夜的记忆又回来了：椅子完好无损，茶杯还温热，甚至连怀表都在滴答作响，唯有坐在椅子上的人化成了两堆白灰。γ 频段被永久列为最高管制序列。',
+    ammo: 2,
+    allowedSpectrums: ['alpha', 'beta', 'delta', 'gamma'],
+    defaultSpectrum: 'alpha',
+    inventory: { deflector: 0, attractor: 0 },
+    ambientObserved: true,
+    emitter: { x: 110, y: 300, angleRad: 0, hasLocalLight: false },
+    walls: [
+      { id: 'w6-top', x: 430, y: 160, w: 410, h: 24, kind: 'concrete' },
+      { id: 'w6-bot', x: 430, y: 416, w: 410, h: 24, kind: 'concrete' },
+      { id: 'w6-right', x: 816, y: 160, w: 24, h: 280, kind: 'concrete' },
+    ],
+    entities: [
+      {
+        id: 'srv-06-prot',
+        name: '机密数据库',
+        role: 'blackbox',
+        x: 525,
+        y: 300,
+        radius: 22,
+        materials: ['alpha'],
+        isProtected: true,
+      },
+      {
+        id: 'cmd-06',
+        name: '敌方生物指令官',
+        role: 'commander',
+        x: 635,
+        y: 300,
+        radius: 22,
+        materials: ['gamma'],
+        requiredDestroyLayers: ['gamma'],
+      },
+      {
+        id: 'fuel-06-prot',
+        name: '临界燃料罐',
+        role: 'fuel_drum',
+        x: 740,
+        y: 300,
+        radius: 22,
+        materials: ['beta'],
+        isProtected: true,
+        blastRadius: 130,
+      },
+    ],
+    devices: [],
+    observers: [],
+    objectives: [
+      {
+        id: 'obj-6-1',
+        text: '使用 γ 碳基频段精准抹除敌方生物指令官',
+        kind: 'destroy_layer',
+        entityId: 'cmd-06',
+        layer: 'gamma',
+      },
+      { id: 'obj-6-2', text: '保全前方机密数据库', kind: 'protect', entityId: 'srv-06-prot' },
+      { id: 'obj-6-3', text: '禁止引爆后方临界燃料罐', kind: 'protect', entityId: 'fuel-06-prot' },
     ],
   },
 
   // =========================================================================
-  // LEVEL 03: 《看不见的房间》—— 观察者效应、量子穿墙与定向坍缩（核心高光）
+  // 第三幕：暗室观测者（EXP-07 ~ EXP-10）
   // =========================================================================
   {
-    id: 'lvl-03',
-    code: 'EXP-03',
-    title: '03 // 看不见的房间',
+    id: 'lvl-07',
+    act: 3,
+    actTitle: '第三幕 · 暗室观测者',
+    code: 'EXP-07',
+    title: '07 // 看不见的房间',
     brief:
       '右侧干扰主站锁死在无门混凝土密室中，唯有底部一块防弹玻璃透光。没有观察者时，宏电子退化为可穿墙的概率云；开启观测的瞬间，波函数立即在光束内坍缩。',
-    hint: '操作提示：1. 按 [O] 关闭己方观测源（注意观察角落神秘蓝玫瑰信号）；2. 趁左侧敌方探照灯转开时按 [F] 朝密室激发；3. 待概率云穿透实墙覆盖密室主站（Ψ > 40%），立即按 [O] 开启窗外信标触发定向坍缩！',
+    hint: '1. 按 [O] 关闭己方观测源（观察角落浮现的量子蓝玫瑰）；2. 趁敌方探照灯转开按 [F] 激发；3. 待概率云穿透实墙覆盖密室主站，再按 [O] 开启窗外信标定向坍缩！',
+    archive:
+      '【2002.02 丁仪的粉笔推演】“没有观察者的时候，它根本不是一个球，而是一团同时存在于墙内与墙外的概率云。只要我们学会主动闭上眼睛，世界上就不存在真正密闭的堡垒。”',
     ammo: 3,
     allowedSpectrums: ['alpha'],
     defaultSpectrum: 'alpha',
-    inventory: {
-      deflector: 0,
-      attractor: 0,
-    },
+    inventory: { deflector: 0, attractor: 0 },
     ambientObserved: false,
-    emitter: {
-      x: 195,
-      y: 260,
-      angleRad: 0,
-      hasLocalLight: true,
-      localLightRange: 130,
-    },
+    emitter: { x: 195, y: 260, angleRad: 0, hasLocalLight: true, localLightRange: 240 },
     walls: [
-      // 全封闭防核混凝土密室（左、上、右全混凝土，下中嵌防弹玻璃窗）
-      {
-        id: 'w3-left',
-        x: 416,
-        y: 108,
-        w: 24,
-        h: 300,
-        kind: 'concrete',
-        label: '防核实墙',
-      },
-      { id: 'w3-top', x: 416, y: 108, w: 380, h: 24, kind: 'concrete' },
-      { id: 'w3-right', x: 772, y: 108, w: 24, h: 300, kind: 'concrete' },
-      { id: 'w3-bot-l', x: 416, y: 384, w: 104, h: 24, kind: 'concrete' },
-      {
-        id: 'w3-glass',
-        x: 520,
-        y: 384,
-        w: 172,
-        h: 24,
-        kind: 'glass',
-        label: '防弹玻璃 (透光)',
-      },
-      { id: 'w3-bot-r', x: 692, y: 384, w: 104, h: 24, kind: 'concrete' },
+      { id: 'w7-left', x: 416, y: 108, w: 24, h: 300, kind: 'concrete', label: '防核实墙' },
+      { id: 'w7-top', x: 416, y: 108, w: 380, h: 24, kind: 'concrete' },
+      { id: 'w7-right', x: 772, y: 108, w: 24, h: 300, kind: 'concrete' },
+      { id: 'w7-bot-l', x: 416, y: 384, w: 104, h: 24, kind: 'concrete' },
+      { id: 'w7-glass', x: 520, y: 384, w: 172, h: 24, kind: 'glass', label: '防弹玻璃 (透光)' },
+      { id: 'w7-bot-r', x: 692, y: 384, w: 104, h: 24, kind: 'concrete' },
     ],
     entities: [
       {
-        id: 'jammer-01',
+        id: 'jammer-07',
         name: '宏电子干扰主站',
         role: 'jammer',
         x: 606,
@@ -267,9 +486,8 @@ export const LEVELS: LevelSpec[] = [
         materials: ['alpha'],
         requiredDestroyLayers: ['alpha'],
       },
-      // 致敬刘慈欣原著：仅在无人观测的绝对黑暗中显现的量子蓝玫瑰
       {
-        id: 'rose-01',
+        id: 'rose-07',
         name: '量子蓝玫瑰 Ψ',
         role: 'quantum_rose',
         x: 724,
@@ -281,7 +499,6 @@ export const LEVELS: LevelSpec[] = [
     ],
     devices: [],
     observers: [
-      // 己方发射器近场监控灯（覆盖至密室左墙外侧；随 [O] 一键开关）
       {
         id: 'obs-emitter',
         name: '发射区监控灯',
@@ -293,7 +510,6 @@ export const LEVELS: LevelSpec[] = [
         active: true,
         owner: 'player',
       },
-      // 己方窗外主动观测信标（透过防弹玻璃照亮密室全境！）
       {
         id: 'obs-window',
         name: '窗外主动观测信标',
@@ -305,7 +521,6 @@ export const LEVELS: LevelSpec[] = [
         active: true,
         owner: 'player',
       },
-      // 敌方巡逻探照灯（慢速摆动，扫向右侧墙顶时在通道留出清晰的 5 秒暗区窗口）
       {
         id: 'obs-patrol',
         name: '敌方巡逻探照灯',
@@ -316,51 +531,506 @@ export const LEVELS: LevelSpec[] = [
         range: 420,
         active: true,
         owner: 'enemy',
-        sweep: {
-          centerRad: 1.48,
-          amplitudeRad: 0.98,
-          speedRadPerSec: 0.42,
-          phaseOffset: 0.3,
-        },
+        sweep: { centerRad: 1.48, amplitudeRad: 0.98, speedRadPerSec: 0.42, phaseOffset: 0.3 },
       },
     ],
     objectives: [
       {
-        id: 'obj-3-1',
+        id: 'obj-7-1',
         text: '通过量子穿墙与波函数坍缩摧毁密室内干扰主站',
         kind: 'destroy_layer',
-        entityId: 'jammer-01',
+        entityId: 'jammer-07',
+        layer: 'alpha',
+      },
+    ],
+  },
+
+  {
+    id: 'lvl-08',
+    act: 3,
+    actTitle: '第三幕 · 暗室观测者',
+    code: 'EXP-08',
+    title: '08 // 阴影幕布',
+    brief:
+      '敌方固定强光探头死死锁定了发射走廊，永远不旋转移开。使用新战术装备【光学遮蔽幕】在敌方光锥下亲手切出一道阴影暗廊，让量子概率云穿过实墙潜入密室。',
+    hint: '1. 选中底部【遮蔽幕】，放到敌方强光探头正下方（横置挡住向下光束，拖拽手柄旋转）；2. 按 [O] 关己方灯后按 [F] 激发穿墙；3. 概率云覆盖密室主站后再按 [O] 坍缩！',
+    archive:
+      '【2002.05 反观测战术手册】敌军意识到全天候探照灯可以强制坍缩我方球状闪电。但只要一块廉价的碳纤维光学遮蔽幕，就能在最刺眼的监控网下撕开一道量子裂隙。',
+    ammo: 3,
+    allowedSpectrums: ['alpha'],
+    defaultSpectrum: 'alpha',
+    inventory: { deflector: 0, attractor: 0, screen: 1 },
+    ambientObserved: false,
+    emitter: { x: 185, y: 270, angleRad: 0, hasLocalLight: true },
+    walls: [
+      { id: 'w8-left', x: 422, y: 112, w: 24, h: 300, kind: 'concrete', label: '防核实墙' },
+      { id: 'w8-top', x: 422, y: 112, w: 374, h: 24, kind: 'concrete' },
+      { id: 'w8-right', x: 772, y: 112, w: 24, h: 300, kind: 'concrete' },
+      { id: 'w8-bot-l', x: 422, y: 388, w: 100, h: 24, kind: 'concrete' },
+      { id: 'w8-glass', x: 522, y: 388, w: 170, h: 24, kind: 'glass', label: '防弹玻璃 (透光)' },
+      { id: 'w8-bot-r', x: 692, y: 388, w: 104, h: 24, kind: 'concrete' },
+    ],
+    entities: [
+      {
+        id: 'jammer-08',
+        name: '加密中继主站',
+        role: 'jammer',
+        x: 608,
+        y: 262,
+        radius: 28,
+        materials: ['alpha'],
+        requiredDestroyLayers: ['alpha'],
+      },
+    ],
+    devices: [],
+    observers: [
+      {
+        id: 'obs-emitter-08',
+        name: '发射区监控灯',
+        x: 185,
+        y: 270,
+        angleRad: 0,
+        fovRad: Math.PI * 2,
+        range: 140,
+        active: true,
+        owner: 'player',
+      },
+      {
+        id: 'obs-window-08',
+        name: '窗外观测信标',
+        x: 608,
+        y: 500,
+        angleRad: -Math.PI / 2,
+        fovRad: 1.38,
+        range: 420,
+        active: true,
+        owner: 'player',
+      },
+      // 固定不动的敌方强光探头（迫使用光学遮蔽幕挡住！）
+      {
+        id: 'obs-static-08',
+        name: '敌方固定强光探头',
+        x: 295,
+        y: 68,
+        angleRad: Math.PI / 2,
+        fovRad: 1.15,
+        range: 430,
+        active: true,
+        owner: 'enemy',
+      },
+    ],
+    objectives: [
+      {
+        id: 'obj-8-1',
+        text: '架设光学遮蔽幕并量子穿墙摧毁加密中继主站',
+        kind: 'destroy_layer',
+        entityId: 'jammer-08',
+        layer: 'alpha',
+      },
+    ],
+  },
+
+  {
+    id: 'lvl-09',
+    act: 3,
+    actTitle: '第三幕 · 暗室观测者',
+    code: 'EXP-09',
+    title: '09 // 双室透视',
+    brief:
+      '两座串连的混凝土密室各自藏有一台目标主站，场景中未预设窗外信标。利用手头唯一的【便携观测信标】，可随时移动定位，分两阶段透视双室精准坍缩。',
+    hint: '1. 按 [O] 切断发射灯，发第 1 发穿墙渗入左室；2. 从底部选中【观测信标】放到左室玻璃外并按 [O] 开启引爆主站 A；3. 按 [O] 关灯、把信标拖到右室玻璃外，发第 2 发深层穿墙后开灯引爆主站 B！',
+    archive:
+      '【2002.09 双层暗箱实验】概率云不仅能穿透一堵墙，只要激发能量尚存，它能像幽灵潮水般依次浸透多层隔间——直到我们主动把手电筒伸向需要坍缩的那一扇窗。',
+    ammo: 3,
+    allowedSpectrums: ['alpha'],
+    defaultSpectrum: 'alpha',
+    inventory: { deflector: 0, attractor: 0, beacon: 1 },
+    ambientObserved: false,
+    emitter: { x: 185, y: 265, angleRad: 0, hasLocalLight: true },
+    walls: [
+      // 双连封闭混凝土密室（A 室 x: 350..536, B 室 x: 536..726）
+      { id: 'w9-l', x: 350, y: 120, w: 20, h: 280, kind: 'concrete' },
+      { id: 'w9-m-t', x: 530, y: 120, w: 18, h: 90, kind: 'concrete' },
+      { id: 'w9-m-g', x: 530, y: 210, w: 18, h: 110, kind: 'glass', label: '内窗' },
+      { id: 'w9-m-b', x: 530, y: 320, w: 18, h: 80, kind: 'concrete' },
+      { id: 'w9-r', x: 716, y: 120, w: 20, h: 280, kind: 'concrete' },
+      { id: 'w9-top', x: 350, y: 120, w: 386, h: 20, kind: 'concrete' },
+      // 底墙带 A/B 两扇防弹玻璃窗
+      { id: 'w9-b1', x: 350, y: 380, w: 42, h: 20, kind: 'concrete' },
+      { id: 'w9-ga', x: 392, y: 380, w: 108, h: 20, kind: 'glass', label: 'A室玻璃' },
+      { id: 'w9-b2', x: 500, y: 380, w: 72, h: 20, kind: 'concrete' },
+      { id: 'w9-gb', x: 572, y: 380, w: 108, h: 20, kind: 'glass', label: 'B室玻璃' },
+      { id: 'w9-b3', x: 680, y: 380, w: 56, h: 20, kind: 'concrete' },
+    ],
+    entities: [
+      {
+        id: 'jammer-09a',
+        name: 'A室干扰主站',
+        role: 'jammer',
+        x: 446,
+        y: 265,
+        radius: 25,
+        materials: ['alpha'],
+        requiredDestroyLayers: ['alpha'],
+      },
+      {
+        id: 'jammer-09b',
+        name: 'B室核心主站',
+        role: 'jammer',
+        x: 626,
+        y: 265,
+        radius: 25,
+        materials: ['alpha'],
+        requiredDestroyLayers: ['alpha'],
+      },
+    ],
+    devices: [],
+    observers: [
+      {
+        id: 'obs-emitter-09',
+        name: '发射区监控灯',
+        x: 185,
+        y: 265,
+        angleRad: 0,
+        fovRad: Math.PI * 2,
+        range: 180,
+        active: true,
+        owner: 'player',
+      },
+    ],
+    objectives: [
+      {
+        id: 'obj-9-1',
+        text: '部署便携信标坍缩摧毁 A室干扰主站',
+        kind: 'destroy_layer',
+        entityId: 'jammer-09a',
+        layer: 'alpha',
+      },
+      {
+        id: 'obj-9-2',
+        text: '二次穿墙并观测坍缩摧毁 B室核心主站',
+        kind: 'destroy_layer',
+        entityId: 'jammer-09b',
+        layer: 'alpha',
+      },
+    ],
+  },
+
+  {
+    id: 'lvl-10',
+    act: 3,
+    actTitle: '第三幕 · 暗室观测者',
+    code: 'EXP-10',
+    title: '10 // 盲区借道',
+    brief:
+      '没有遮蔽幕，而敌方监控探头正死死照着整条走廊。别忘了监控探头本身也是硅基电子设备——先用一颗经典态 α 宏电子烧毁敌方探头，亲手熄灭光明再量子穿墙。',
+    hint: '1. 拖动发生器向上瞄准敌方【监控主控探头】按 [F] 将其烧毁（红光永久熄灭）；2. 瞄准右侧密室、按 [O] 关闭己方灯发射穿墙；3. 概率云覆盖密室核心后按 [O] 坍缩！',
+    archive:
+      '【2003.01 阵地破袭复盘】“既然观测者阻止了量子隧穿，那就先消灭观测者。”——把敌人监控阵列的主板气化的那一秒，整个战区对我们而言便成了无墙的透明世界。',
+    ammo: 3,
+    allowedSpectrums: ['alpha'],
+    defaultSpectrum: 'alpha',
+    inventory: { deflector: 0, attractor: 0 },
+    ambientObserved: false,
+    emitter: { x: 185, y: 270, angleRad: 0, hasLocalLight: true },
+    walls: [
+      { id: 'w10-l', x: 422, y: 112, w: 24, h: 300, kind: 'concrete', label: '防核实墙' },
+      { id: 'w10-t', x: 422, y: 112, w: 374, h: 24, kind: 'concrete' },
+      { id: 'w10-r', x: 772, y: 112, w: 24, h: 300, kind: 'concrete' },
+      { id: 'w10-bl', x: 422, y: 388, w: 100, h: 24, kind: 'concrete' },
+      { id: 'w10-g', x: 522, y: 388, w: 170, h: 24, kind: 'glass', label: '防弹玻璃' },
+      { id: 'w10-br', x: 692, y: 388, w: 104, h: 24, kind: 'concrete' },
+    ],
+    entities: [
+      // 可被 α 烧毁从而永久熄灭敌方光锥的监控主控实体
+      {
+        id: 'cam-10',
+        name: '敌方监控探头',
+        role: 'camera_node',
+        x: 308,
+        y: 120,
+        radius: 22,
+        materials: ['alpha'],
+        linkedObserverId: 'obs-cam-10',
+      },
+      {
+        id: 'jammer-10',
+        name: '深层核控主站',
+        role: 'jammer',
+        x: 610,
+        y: 262,
+        radius: 28,
+        materials: ['alpha'],
+        requiredDestroyLayers: ['alpha'],
+      },
+    ],
+    devices: [],
+    observers: [
+      {
+        id: 'obs-emitter-10',
+        name: '发射区监控灯',
+        x: 185,
+        y: 270,
+        angleRad: 0,
+        fovRad: Math.PI * 2,
+        range: 240,
+        active: true,
+        owner: 'player',
+      },
+      {
+        id: 'obs-window-10',
+        name: '窗外观测信标',
+        x: 610,
+        y: 500,
+        angleRad: -Math.PI / 2,
+        fovRad: 1.38,
+        range: 420,
+        active: true,
+        owner: 'player',
+      },
+      {
+        id: 'obs-cam-10',
+        name: '敌方监控光锥',
+        x: 308,
+        y: 120,
+        angleRad: Math.PI / 2,
+        fovRad: 1.45,
+        range: 400,
+        active: true,
+        owner: 'enemy',
+      },
+    ],
+    objectives: [
+      {
+        id: 'obj-10-1',
+        text: '先摧毁敌方监控探头制造盲区，再量子穿墙摧毁深层核控主站',
+        kind: 'destroy_layer',
+        entityId: 'jammer-10',
         layer: 'alpha',
       },
     ],
   },
 
   // =========================================================================
-  // LEVEL 04: 《619 量子沙盒》—— 自由物理实验场（全四元频谱 + 无限装置）
+  // 第四幕：珠峰微核与芯片危机（EXP-11 ~ EXP-12）
   // =========================================================================
   {
-    id: 'lvl-04',
-    code: 'SANDBOX',
-    title: '04 // 619 自由实验室',
+    id: 'lvl-11',
+    act: 4,
+    actTitle: '第四幕 · 珠峰微核与芯片危机',
+    code: 'EXP-11',
+    title: '11 // 宏聚变协议',
     brief:
-      '开放全部四元谐振频段（含 γ 碳基频段）、无限宏电子与自由电磁装置布设，支持任意组合观察者盲区穿墙与复合材质剥离实验。',
-    hint: '自由实验：点击场景中的绿色信标可单独开关某盏灯；右键已部署装置可回收；拖动发射器或偏转器箭头调整任意角度。',
+      '三座完全封闭的微核芯片阵列环绕在中央共振室四周，而你仅有 2 颗宏电子！开启【双球宏聚变协议】：让两颗球状闪电在中央交汇碰撞，引爆半径 235px 无视一切实墙的共振脉冲，一举清空三座阵列！',
+    hint: '在中央空地右侧 (630, 300) 放 1 个【磁偏转器】把箭头朝左指（180° 折返）！先按 [F] 发射第 1 发，等它进入右侧偏转器开始折返朝左飞回时，立刻再按 [F] 发射第 2 发，两球迎面相撞即爆发宏聚变！',
+    archive:
+      '【2004.07 珠峰宏聚变实验纪要】单颗宏电子只能摧毁一个点，但两颗激发态宏电子在极近距离发生耦合聚变时，释放的共振波将穿透数米厚的钢筋混凝土，令整个芯片频段归于绝对静默。',
+    ammo: 2,
+    maxConcurrentElectrons: 2,
+    macroFusionEnabled: true,
+    allowedSpectrums: ['alpha', 'delta'],
+    defaultSpectrum: 'alpha',
+    inventory: { deflector: 2, attractor: 0 },
+    ambientObserved: true,
+    emitter: { x: 120, y: 300, angleRad: 0, hasLocalLight: false },
+    walls: [
+      // 上密室（完全封闭）
+      { id: 'w11-u1', x: 520, y: 80, w: 180, h: 18, kind: 'concrete' },
+      { id: 'w11-u2', x: 520, y: 196, w: 180, h: 18, kind: 'concrete' },
+      { id: 'w11-u3', x: 520, y: 80, w: 18, h: 134, kind: 'concrete' },
+      { id: 'w11-u4', x: 682, y: 80, w: 18, h: 134, kind: 'concrete' },
+      // 右密室（完全封闭）
+      { id: 'w11-r1', x: 685, y: 230, w: 140, h: 18, kind: 'concrete' },
+      { id: 'w11-r2', x: 685, y: 352, w: 140, h: 18, kind: 'concrete' },
+      { id: 'w11-r3', x: 685, y: 230, w: 18, h: 140, kind: 'concrete' },
+      { id: 'w11-r4', x: 807, y: 230, w: 18, h: 140, kind: 'concrete' },
+      // 下密室（完全封闭）
+      { id: 'w11-d1', x: 520, y: 386, w: 180, h: 18, kind: 'concrete' },
+      { id: 'w11-d2', x: 520, y: 502, w: 180, h: 18, kind: 'concrete' },
+      { id: 'w11-d3', x: 520, y: 386, w: 18, h: 134, kind: 'concrete' },
+      { id: 'w11-d4', x: 682, y: 386, w: 18, h: 134, kind: 'concrete' },
+    ],
+    entities: [
+      {
+        id: 'arr-11-u',
+        name: '北侧芯片阵列',
+        role: 'server',
+        x: 610,
+        y: 147,
+        radius: 24,
+        materials: ['alpha'],
+        requiredDestroyLayers: ['alpha'],
+      },
+      {
+        id: 'arr-11-r',
+        name: '东侧芯片阵列',
+        role: 'server',
+        x: 754,
+        y: 300,
+        radius: 24,
+        materials: ['alpha'],
+        requiredDestroyLayers: ['alpha'],
+      },
+      {
+        id: 'arr-11-d',
+        name: '南侧芯片阵列',
+        role: 'server',
+        x: 610,
+        y: 453,
+        radius: 24,
+        materials: ['alpha'],
+        requiredDestroyLayers: ['alpha'],
+      },
+    ],
+    devices: [],
+    observers: [],
+    objectives: [
+      {
+        id: 'obj-11-u',
+        text: '隔墙抹除北侧芯片阵列',
+        kind: 'destroy_layer',
+        entityId: 'arr-11-u',
+        layer: 'alpha',
+      },
+      {
+        id: 'obj-11-r',
+        text: '隔墙抹除东侧芯片阵列',
+        kind: 'destroy_layer',
+        entityId: 'arr-11-r',
+        layer: 'alpha',
+      },
+      {
+        id: 'obj-11-d',
+        text: '隔墙抹除南侧芯片阵列',
+        kind: 'destroy_layer',
+        entityId: 'arr-11-d',
+        layer: 'alpha',
+      },
+    ],
+  },
+
+  {
+    id: 'lvl-12',
+    act: 4,
+    actTitle: '第四幕 · 珠峰微核与芯片危机',
+    code: 'EXP-12',
+    title: '12 // 蓝玫瑰的观测',
+    brief:
+      '终局危机：走廊被不可摧毁的敌方超强探照灯死锁，且你没有任何遮蔽幕。唯有主动关闭全部己方观测，让密室角落里处于量子态的“她（Ψ 蓝玫瑰）”在绝对黑暗中显化并压制敌灯，完成最后一击。',
+    hint: '1. 按 [O] 彻底关闭全部己方观测！2. 当密室陷入绝对黑暗，角落的【Ψ 蓝玫瑰量子态】将显化并奇迹般压制熄灭走廊敌灯！3. 趁黑暗按 [F] 激发穿墙，待概率云覆及终极微核中枢，再按 [O] 完成终局坍缩。',
+    archive:
+      '【终章 · 致林云】“在没有任何观察者的黑暗里，那束幽蓝的玫瑰静静盛开在实验台旁。只要我们愿意闭上眼睛，她就始终存在于这个世界的波函数之中，替我们挡住最后一束强光。”',
+    ammo: 3,
+    allowedSpectrums: ['alpha'],
+    defaultSpectrum: 'alpha',
+    inventory: { deflector: 0, attractor: 0 },
+    ambientObserved: false,
+    emitter: { x: 185, y: 275, angleRad: 0, hasLocalLight: true },
+    walls: [
+      { id: 'w12-l', x: 414, y: 108, w: 24, h: 316, kind: 'concrete', label: '微核隔离壁' },
+      { id: 'w12-t', x: 414, y: 108, w: 382, h: 24, kind: 'concrete' },
+      { id: 'w12-r', x: 772, y: 108, w: 24, h: 316, kind: 'concrete' },
+      { id: 'w12-bl', x: 414, y: 400, w: 100, h: 24, kind: 'concrete' },
+      { id: 'w12-g', x: 514, y: 400, w: 176, h: 24, kind: 'glass', label: '观测防弹玻璃' },
+      { id: 'w12-br', x: 690, y: 400, w: 106, h: 24, kind: 'concrete' },
+    ],
+    entities: [
+      {
+        id: 'core-12',
+        name: '终极微核控制中枢',
+        role: 'jammer',
+        x: 602,
+        y: 275,
+        radius: 30,
+        materials: ['alpha'],
+        requiredDestroyLayers: ['alpha'],
+      },
+      // 终局机制核心：当密室完全无观测时显化，自动压制熄灭走廊上方的敌方强光探照灯！
+      {
+        id: 'rose-12',
+        name: '林云 · Ψ 蓝玫瑰',
+        role: 'quantum_rose',
+        x: 716,
+        y: 184,
+        radius: 18,
+        materials: [],
+        quantumGhostOnly: true,
+        suppressObserverId: 'obs-boss-12',
+      },
+    ],
+    devices: [],
+    observers: [
+      {
+        id: 'obs-emitter-12',
+        name: '发射区监控灯',
+        x: 185,
+        y: 275,
+        angleRad: 0,
+        fovRad: Math.PI * 2,
+        range: 145,
+        active: true,
+        owner: 'player',
+      },
+      {
+        id: 'obs-window-12',
+        name: '窗外主动观测信标',
+        x: 602,
+        y: 510,
+        angleRad: -Math.PI / 2,
+        fovRad: 1.45,
+        range: 440,
+        active: true,
+        owner: 'player',
+      },
+      // 被蓝玫瑰在暗区压制的不可摧毁强光探头
+      {
+        id: 'obs-boss-12',
+        name: '敌方阵列强光锁',
+        x: 298,
+        y: 66,
+        angleRad: Math.PI / 2,
+        fovRad: 1.35,
+        range: 460,
+        active: true,
+        owner: 'enemy',
+      },
+    ],
+    objectives: [
+      {
+        id: 'obj-12-1',
+        text: '唤醒无观测量子蓝玫瑰压制敌灯，并坍缩摧毁终极微核控制中枢',
+        kind: 'destroy_layer',
+        entityId: 'core-12',
+        layer: 'alpha',
+      },
+    ],
+  },
+
+  // =========================================================================
+  // 自由沙盒模式（SANDBOX）
+  // =========================================================================
+  {
+    id: 'lvl-sandbox',
+    act: 0,
+    actTitle: '自由实验场',
+    code: 'SANDBOX',
+    title: 'SB // 619 自由实验室',
+    brief:
+      '全要素物理沙盒：开放四元频谱、无限宏电子、同场双球宏聚变以及全部 4 类战术装置（磁偏转器、引雷针、光学遮蔽幕、便携观测信标），自由探索任意物理组合。',
+    hint: '自由实验：可同时发射多颗宏电子测试宏聚变，可拉起光学遮蔽幕切割敌方光锥，右键任意已部署装置可一键回收。',
+    archive:
+      '【619 实验室开放协议】一切物理规律在此敞开：电磁偏转、贴壁滑行、四元选择性气化、双球宏聚变、观察者量子坍缩。欢迎继续推演宇宙的隐秘角落。',
     ammo: -1,
+    maxConcurrentElectrons: 4,
+    macroFusionEnabled: true,
     allowedSpectrums: ['alpha', 'beta', 'delta', 'gamma'],
     defaultSpectrum: 'alpha',
-    inventory: {
-      deflector: 99,
-      attractor: 99,
-    },
+    inventory: { deflector: 99, attractor: 99, screen: 99, beacon: 99 },
     ambientObserved: false,
     isSandbox: true,
-    emitter: {
-      x: 105,
-      y: 300,
-      angleRad: 0,
-      hasLocalLight: true,
-    },
+    emitter: { x: 105, y: 300, angleRad: 0, hasLocalLight: true },
     walls: [
+      { id: 'sb-rail', x: 170, y: 100, w: 230, h: 18, kind: 'metal_rail', label: '导流壁' },
       { id: 'sb-w1', x: 460, y: 120, w: 24, h: 170, kind: 'concrete' },
       { id: 'sb-w2', x: 460, y: 290, w: 24, h: 90, kind: 'steel_door', label: '钢门 [δ]' },
       { id: 'sb-w3', x: 460, y: 380, w: 24, h: 110, kind: 'concrete' },
@@ -384,7 +1054,7 @@ export const LEVELS: LevelSpec[] = [
         name: '四元复合靶车',
         role: 'missile_truck',
         x: 685,
-        y: 260,
+        y: 250,
         radius: 30,
         materials: ['delta', 'alpha', 'beta', 'gamma'],
         blastRadius: 110,
@@ -403,7 +1073,7 @@ export const LEVELS: LevelSpec[] = [
         name: '量子蓝玫瑰 Ψ',
         role: 'quantum_rose',
         x: 765,
-        y: 195,
+        y: 185,
         radius: 16,
         materials: [],
         quantumGhostOnly: true,
@@ -414,7 +1084,7 @@ export const LEVELS: LevelSpec[] = [
         id: 'sb-attr-1',
         kind: 'attractor',
         x: 310,
-        y: 165,
+        y: 185,
         angleRad: 0,
         radius: 108,
         fixed: false,

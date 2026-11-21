@@ -26,7 +26,7 @@ export const SPECTRUM_META: Record<SpectrumType, SpectrumMeta> = {
     shortName: '硅基电子',
     color: '#00E5FF',
     glow: 'rgba(0, 229, 255, 0.65)',
-    desc: '仅抹除芯片、雷达、火控与精密电子设备，不伤人员与建筑',
+    desc: '仅抹除芯片、雷达、监控探头与精密电子设备，不伤人员与建筑',
   },
   beta: {
     id: 'beta',
@@ -53,7 +53,7 @@ export const SPECTRUM_META: Record<SpectrumType, SpectrumMeta> = {
     shortName: '碳基有机',
     color: '#D500F9',
     glow: 'rgba(213, 0, 249, 0.65)',
-    desc: '选择性气化碳基目标而保留金属器物（高伦理禁区）',
+    desc: '选择性气化碳基目标而完整保留精密芯片、金属与高爆器物',
   },
 };
 
@@ -62,7 +62,7 @@ export interface Vec2 {
   y: number;
 }
 
-export type WallKind = 'concrete' | 'glass' | 'steel_door';
+export type WallKind = 'concrete' | 'glass' | 'steel_door' | 'metal_rail';
 
 export interface WallSpec {
   id: string;
@@ -84,7 +84,9 @@ export type EntityRole =
   | 'fuel_drum'
   | 'blackbox'
   | 'scientist'
+  | 'commander'
   | 'jammer'
+  | 'camera_node'
   | 'quantum_rose';
 
 export interface EntitySpec {
@@ -100,8 +102,12 @@ export interface EntitySpec {
   requiredDestroyLayers?: SpectrumType[];
   /** 若包含 beta 且被摧毁时的次生爆炸半径 */
   blastRadius?: number;
-  /** 仅在无观测暗区显现的量子幽灵彩蛋 */
+  /** 若为可破坏监控节点，摧毁其 alpha 层后同步关闭关联的敌方观测源 ID */
+  linkedObserverId?: string;
+  /** 仅在无观测暗区显现的量子幽灵实体 */
   quantumGhostOnly?: boolean;
+  /** 当量子幽灵处于无观测显化态时，可压制（临时关闭）指定的敌方观测源 ID */
+  suppressObserverId?: string;
 }
 
 export interface EntityState extends EntitySpec {
@@ -111,23 +117,29 @@ export interface EntityState extends EntitySpec {
   blastTriggered: boolean;
   /** 异频无害穿透时的视觉反馈倒计时 */
   phasePassTimer: number;
+  /** 量子幽灵当前是否处于无观测激活态 */
+  ghostActive: boolean;
 }
 
-export type DeviceKind = 'deflector' | 'attractor';
+export type DeviceKind = 'deflector' | 'attractor' | 'screen' | 'beacon';
 
 export interface DeviceSpec {
   id: string;
   kind: DeviceKind;
   x: number;
   y: number;
-  /** 仅 deflector 使用：导向弧度 */
+  /** deflector / screen / beacon 的朝向弧度 */
   angleRad: number;
+  /** 电磁作用半径或遮蔽幕半长 */
   radius: number;
   fixed?: boolean;
+  /** 仅 beacon 使用：关联生成的观测源是否默认开启 */
+  beaconActive?: boolean;
 }
 
 export interface DeviceState extends DeviceSpec {
   pulseTimer: number;
+  linkedObserverId?: string;
 }
 
 export interface ObserverSpec {
@@ -151,6 +163,12 @@ export interface ObserverSpec {
 
 export interface ObserverState extends ObserverSpec {
   polygon: Vec2[];
+  /** 被关联的监控节点摧毁导致永久失能 */
+  permanentlyDisabled: boolean;
+  /** 被暗区量子幽灵临时压制 */
+  suppressedByGhost: boolean;
+  /** 是否源自玩家部署的便携信标装置 */
+  sourceDeviceId?: string;
 }
 
 export interface EmitterSpec {
@@ -159,7 +177,6 @@ export interface EmitterSpec {
   angleRad: number;
   minAngleRad?: number;
   maxAngleRad?: number;
-  /** 发射器是否自带可随己方观测开关同步的近场监测灯 */
   hasLocalLight: boolean;
   localLightRange?: number;
 }
@@ -172,26 +189,38 @@ export interface ObjectiveSpec {
   layer?: SpectrumType;
 }
 
+export interface LevelInventory {
+  deflector: number;
+  attractor: number;
+  screen?: number;
+  beacon?: number;
+}
+
 export interface LevelSpec {
   id: string;
+  act: 1 | 2 | 3 | 4 | 0;
+  actTitle: string;
   code: string;
   title: string;
   brief: string;
   hint: string;
+  /** 619 项目实验档案碎片（原著风格硬科幻叙事文本） */
+  archive: string;
   ammo: number; // -1 表示无限（沙盒模式）
+  /** 允许场内同时活跃的最大宏电子数（默认为 1；宏聚变/沙盒关为 2+） */
+  maxConcurrentElectrons?: number;
+  /** 是否开启双球共鸣宏聚变机制 */
+  macroFusionEnabled?: boolean;
   allowedSpectrums: SpectrumType[];
   defaultSpectrum: SpectrumType;
-  inventory: {
-    deflector: number;
-    attractor: number;
-  };
+  inventory: LevelInventory;
   emitter: EmitterSpec;
   walls: WallSpec[];
   entities: EntitySpec[];
   devices: DeviceSpec[];
   observers: ObserverSpec[];
   objectives: ObjectiveSpec[];
-  /** 是否默认处于全局常亮监控环境（第 1、2 关聚焦动力学与频谱，第 3 关切换至真实观测盲区机制） */
+  /** 是否默认处于全局常亮监控环境 */
   ambientObserved?: boolean;
   isSandbox?: boolean;
 }
@@ -213,7 +242,6 @@ export interface MacroElectronState {
   cloudAge: number;
   trail: Vec2[];
   chargedDeviceIds: Set<string>;
-  /** 刚穿过的非匹配实体，避免单次穿过刷屏日志 */
   passedEntityIds: Set<string>;
 }
 
@@ -223,12 +251,14 @@ export interface FxEvent {
     | 'collapse_implosion'
     | 'selective_vaporize'
     | 'secondary_blast'
+    | 'macro_fusion'
     | 'wall_fizzle'
     | 'charge_arc'
     | 'phase_pass';
   x: number;
   y: number;
   color: string;
+  secondaryColor?: string;
   radius: number;
   age: number;
   duration: number;
@@ -250,6 +280,7 @@ export interface SimEventCallbacks {
   onModeChange?: (mode: ElectronMode) => void;
   onCollapse?: (x: number, y: number, hitTarget: boolean) => void;
   onVaporize?: (spectrum: SpectrumType, secondaryBlast: boolean) => void;
+  onMacroFusion?: () => void;
   onCharge?: () => void;
   onFizzle?: () => void;
   onObserverToggle?: (active: boolean) => void;

@@ -8,11 +8,17 @@ import {
   WORLD_HEIGHT,
   WORLD_WIDTH,
 } from './types';
-import { angleDiff, dist, segmentRectHit, wallBlocksClassical } from './geometry';
+import {
+  angleDiff,
+  computeMetalRailSlide,
+  dist,
+  segmentRectHit,
+  wallBlocksClassical,
+} from './geometry';
 
 export const ELECTRON_BASE_SPEED = 185; // px/s
-export const CLASSICAL_DECAY_PER_SEC = 18; // 约 5.5 秒航程 (~1017px)
-export const CLOUD_DECAY_PER_SEC = 9; // 概率云更持久，便于穿墙弥散
+export const CLASSICAL_DECAY_PER_SEC = 18; // ~5.5s 基础寿命
+export const CLOUD_DECAY_PER_SEC = 9;
 export const ATTRACTOR_CHARGE_AMOUNT = 38;
 
 export interface StepEMResult {
@@ -34,6 +40,8 @@ export function applyEMForces(
   let chargedDevice: DeviceState | undefined;
 
   for (const dev of devices) {
+    if (dev.kind !== 'deflector' && dev.kind !== 'attractor') continue;
+
     const dx = dev.x - electron.x;
     const dy = dev.y - electron.y;
     const d = Math.hypot(dx, dy);
@@ -41,24 +49,23 @@ export function applyEMForces(
     if (d > dev.radius) continue;
 
     if (dev.kind === 'deflector') {
-      // 超导磁偏转器：进入作用圈后强力、平滑地把运动矢量导向 dev.angleRad
-      const influence = 1 - d / dev.radius; // 越靠近中心控制力越强
+      const influence = 1 - d / dev.radius;
       const targetAngle = dev.angleRad;
       const diff = angleDiff(curAngle, targetAngle);
-      const turnRate = 9.5 + influence * 14.0;
+      // 越靠近中心磁透镜核心转向越果断，防止在作用圈外缘过早拐弯导致平行偏移
+      const turnRate = 3.5 + influence * influence * 28.0;
       curAngle += diff * Math.min(1, turnRate * dt);
 
-      // 轻微横向束流居中（沿导向轴线收束），显著提升瞄准可预测性与手感
+      // 沿导向轴线强力束流收束（所见即所得：出射轨迹紧贴箭头指向线）
       const axisX = Math.cos(targetAngle);
       const axisY = Math.sin(targetAngle);
       const relX = electron.x - dev.x;
       const relY = electron.y - dev.y;
-      const cross = relX * axisY - relY * axisX; // 垂直于导向轴的偏移
-      const recenterStrength = 2.4 * influence * dt;
+      const cross = relX * axisY - relY * axisX;
+      const recenterStrength = (1.5 + influence * 6.5) * dt;
       electron.x += axisY * -cross * recenterStrength;
       electron.y += -axisX * -cross * recenterStrength;
     } else if (dev.kind === 'attractor') {
-      // 高压引雷针：未充能前产生明显引力吸附，经过核心即完成充能并释放脱轨
       if (!electron.chargedDeviceIds.has(dev.id)) {
         if (d < 24) {
           electron.chargedDeviceIds.add(dev.id);
@@ -87,7 +94,7 @@ export interface PredictionPoint extends Vec2 {
 }
 
 /**
- * 为玩家在时停/瞄准阶段推演前瞻虚拟轨道（遇到墙体或进入无观测盲区切换为提示点）
+ * 为玩家在时停/瞄准阶段推演前瞻虚拟轨道（支持磁偏转、引雷针、金属壁贴壁滑行与盲区入口标注）
  */
 export function predictTrajectory(
   startX: number,
@@ -97,7 +104,7 @@ export function predictTrajectory(
   devices: DeviceState[],
   walls: WallState[],
   isObservedFn: (x: number, y: number) => boolean,
-  maxSeconds = 3.2
+  maxSeconds = 3.6
 ): {
   points: PredictionPoint[];
   enteredBlindZoneAt?: Vec2;
@@ -127,7 +134,6 @@ export function predictTrajectory(
 
     if (!obs) {
       enteredBlindZoneAt = { x: sim.x, y: sim.y };
-      // 盲区中转为概率云，不再延续确定性经典轨迹，只画到盲区入口
       break;
     }
 
@@ -138,32 +144,42 @@ export function predictTrajectory(
     const nextX = sim.x + sim.vx * FIXED_DT;
     const nextY = sim.y + sim.vy * FIXED_DT;
 
-    // 边界检查
     if (nextX < 4 || nextX > WORLD_WIDTH - 4 || nextY < 4 || nextY > WORLD_HEIGHT - 4) {
       hitWallAt = { x: nextX, y: nextY };
       points.push({ x: nextX, y: nextY, observed: true });
       break;
     }
 
-    // 墙体阻挡预测
-    let blocked = false;
+    let closestWall: WallState | null = null;
+    let closestT = Infinity;
     for (const w of walls) {
       if (!wallBlocksClassical(w)) continue;
-      const t = segmentRectHit(prevX, prevY, nextX, nextY, w.x, w.y, w.w, w.h, 5);
-      if (t !== null) {
-        const hx = prevX + (nextX - prevX) * t;
-        const hy = prevY + (nextY - prevY) * t;
-        hitWallAt = { x: hx, y: hy };
-        points.push({ x: hx, y: hy, observed: true });
-        // 如果是钢门且当前频段是 delta，提示可气化
-        if (w.kind === 'steel_door' && spectrum === 'delta') {
-          hitWallAt = undefined;
-        }
-        blocked = true;
-        break;
+      const t = segmentRectHit(prevX, prevY, nextX, nextY, w.x, w.y, w.w, w.h, 6);
+      if (t !== null && t < closestT) {
+        closestT = t;
+        closestWall = w;
       }
     }
-    if (blocked) break;
+
+    if (closestWall) {
+      const hx = prevX + (nextX - prevX) * closestT;
+      const hy = prevY + (nextY - prevY) * closestT;
+      if (closestWall.kind === 'metal_rail') {
+        const slid = computeMetalRailSlide(hx, hy, sim.vx, sim.vy, sim.speed, closestWall);
+        sim.x = slid.x;
+        sim.y = slid.y;
+        sim.vx = slid.vx;
+        sim.vy = slid.vy;
+        sim.stability -= CLASSICAL_DECAY_PER_SEC * FIXED_DT;
+        continue;
+      }
+      hitWallAt = { x: hx, y: hy };
+      points.push({ x: hx, y: hy, observed: true });
+      if (closestWall.kind === 'steel_door' && spectrum === 'delta') {
+        hitWallAt = undefined;
+      }
+      break;
+    }
 
     sim.x = nextX;
     sim.y = nextY;

@@ -13,12 +13,42 @@ import { dist } from './sim/geometry';
 import { BlueprintRenderer, RenderUIState } from './render/BlueprintRenderer';
 import { SoundSynth } from './render/SoundSynth';
 
+const STORAGE_KEY = 'macro_electron_cleared_v2';
+
+function loadClearedSet(): Set<string> {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    if (Array.isArray(arr)) return new Set(arr.filter((x): x is string => typeof x === 'string'));
+  } catch {
+    // ignore storage errors
+  }
+  return new Set();
+}
+
+function saveClearedSet(set: Set<string>): void {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(set)));
+  } catch {
+    // ignore storage errors
+  }
+}
+
 // DOM 引用
 const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
 const stageShell = document.querySelector('.stage-shell') as HTMLElement;
+const campaignProgressEl = document.getElementById('campaignProgress') as HTMLElement;
 const levelTabsEl = document.getElementById('levelTabs') as HTMLElement;
+const actBadgeEl = document.getElementById('actBadge') as HTMLElement;
 const levelTitleEl = document.getElementById('levelTitle') as HTMLElement;
 const levelBriefEl = document.getElementById('levelBrief') as HTMLElement;
+const archiveTextEl = document.getElementById('archiveText') as HTMLElement;
+const briefViewEl = document.getElementById('briefView') as HTMLElement;
+const archiveViewEl = document.getElementById('archiveView') as HTMLElement;
+const tabBriefBtn = document.getElementById('tabBriefBtn') as HTMLButtonElement;
+const tabArchiveBtn = document.getElementById('tabArchiveBtn') as HTMLButtonElement;
+
 const ammoDisplayEl = document.getElementById('ammoDisplay') as HTMLElement;
 const objectiveListEl = document.getElementById('objectiveList') as HTMLElement;
 const stabilityBarEl = document.getElementById('stabilityBar') as HTMLElement;
@@ -48,13 +78,14 @@ const resultCard = resultModal.querySelector('.result-card') as HTMLElement;
 const resultKicker = document.getElementById('resultKicker') as HTMLElement;
 const resultTitle = document.getElementById('resultTitle') as HTMLElement;
 const resultDesc = document.getElementById('resultDesc') as HTMLElement;
+const resultArchive = document.getElementById('resultArchive') as HTMLElement;
 const btnNextLevel = document.getElementById('btnNextLevel') as HTMLButtonElement;
 const btnRetryModal = document.getElementById('btnRetryModal') as HTMLButtonElement;
 
 // 状态与核心实例
 const sound = new SoundSynth();
 const renderer = new BlueprintRenderer(canvas);
-const clearedLevelIds = new Set<string>();
+const clearedLevelIds = loadClearedSet();
 let currentLevelIndex = 0;
 
 let toastTimer: number | null = null;
@@ -73,6 +104,7 @@ const world = new SimulationWorld(LEVELS[0], {
   onModeChange: (mode) => sound.startAmbientHum(mode),
   onCollapse: (_x, _y, hit) => sound.playCollapse(hit),
   onVaporize: (_spec, secondary) => sound.playVaporize(secondary),
+  onMacroFusion: () => sound.playMacroFusion(),
   onCharge: () => sound.playCharge(),
   onFizzle: () => sound.playFizzle(),
   onObserverToggle: (active) => sound.playRelayClick(active),
@@ -92,21 +124,32 @@ const uiState: RenderUIState = {
 type DragMode =
   | { kind: 'none' }
   | { kind: 'aim_emitter' }
-  | { kind: 'move_device'; deviceId: string }
+  | { kind: 'move_device'; deviceId: string; startX: number; startY: number; moved: boolean }
   | { kind: 'rotate_device'; deviceId: string };
 
 let dragMode: DragMode = { kind: 'none' };
 let lastLogSignature = '';
 let lastStatusShown: string = 'playing';
 
-// 初始化 & 切换关卡
+// 侧栏标签页切换（简报 vs 619 实验档案）
+function setSidebarTab(tab: 'brief' | 'archive'): void {
+  const isBrief = tab === 'brief';
+  tabBriefBtn.classList.toggle('active', isBrief);
+  tabArchiveBtn.classList.toggle('active', !isBrief);
+  briefViewEl.classList.toggle('hidden', !isBrief);
+  archiveViewEl.classList.toggle('hidden', isBrief);
+}
+
+tabBriefBtn.addEventListener('click', () => setSidebarTab('brief'));
+tabArchiveBtn.addEventListener('click', () => setSidebarTab('archive'));
+
 function selectLevel(index: number): void {
   currentLevelIndex = index;
   const spec = LEVELS[index];
   sound.stopAmbientHum();
   world.loadLevel(spec);
 
-  // 含动态敌方巡逻探照灯的关卡默认直接进入实时光锥扫掠，方便玩家观察窗口
+  // 含敌方动态巡逻探照灯的关卡默认实时运转，便于直观捕捉暗区窗口
   if (spec.observers.some((o) => o.sweep)) {
     world.paused = false;
   }
@@ -116,6 +159,7 @@ function selectLevel(index: number): void {
   dragMode = { kind: 'none' };
   lastStatusShown = 'playing';
   resultModal.classList.add('hidden');
+  setSidebarTab('brief');
 
   renderLevelTabs();
   renderStaticLevelInfo();
@@ -125,21 +169,30 @@ function selectLevel(index: number): void {
 }
 
 function renderLevelTabs(): void {
+  const campaignLevels = LEVELS.filter((l) => !l.isSandbox);
+  const clearedCount = campaignLevels.filter((l) => clearedLevelIds.has(l.id)).length;
+  campaignProgressEl.textContent = `战役 ${clearedCount}/${campaignLevels.length}`;
+
   levelTabsEl.innerHTML = '';
   LEVELS.forEach((lvl, idx) => {
     const btn = document.createElement('button');
     btn.className = 'level-tab';
+    if (lvl.isSandbox) btn.classList.add('sandbox-tab');
     if (idx === currentLevelIndex) btn.classList.add('active');
     if (clearedLevelIds.has(lvl.id)) btn.classList.add('cleared');
-    btn.textContent = lvl.title;
+
+    btn.title = `${lvl.actTitle} — ${lvl.title}`;
+    btn.textContent = lvl.isSandbox ? '沙盒' : String(idx + 1).padStart(2, '0');
     btn.addEventListener('click', () => selectLevel(idx));
     levelTabsEl.appendChild(btn);
   });
 }
 
 function renderStaticLevelInfo(): void {
+  actBadgeEl.textContent = world.level.actTitle;
   levelTitleEl.textContent = world.level.title;
   levelBriefEl.textContent = world.level.brief;
+  archiveTextEl.textContent = world.level.archive;
   hintBoxEl.textContent = world.level.hint;
 }
 
@@ -161,9 +214,7 @@ function renderSpectrumBar(): void {
       <span>${meta.symbol} ${meta.shortName}</span>
     `;
     btn.addEventListener('click', () => {
-      if (world.setSpectrum(spec)) {
-        renderSpectrumBar();
-      }
+      if (world.setSpectrum(spec)) renderSpectrumBar();
     });
     spectrumBarEl.appendChild(btn);
   });
@@ -171,20 +222,47 @@ function renderSpectrumBar(): void {
 
 function renderToolBar(): void {
   toolBarEl.innerHTML = '';
-  const tools: { kind: DeviceKind; label: string; tip: string }[] = [
+  const allTools: { kind: DeviceKind; label: string; tip: string }[] = [
     {
       kind: 'deflector',
       label: '磁偏转器',
-      tip: '点击画布部署，拖拽外侧圆点可旋转偏转方向，右键可回收',
+      tip: '点击部署，拖拽外侧圆点可旋转偏转方向，右键回收',
     },
     {
       kind: 'attractor',
       label: '引雷针',
-      tip: '强力吸附经典态宏电子并提供 +38% 能量续命',
+      tip: '吸附经典态宏电子并提供 +38% 能量续命',
+    },
+    {
+      kind: 'screen',
+      label: '遮蔽幕',
+      tip: '物理阻挡敌方探照灯光锥，在光束下切出阴影暗区',
+    },
+    {
+      kind: 'beacon',
+      label: '观测信标',
+      tip: '便携式主动观测源：单击开关光束，拖拽移动或转向',
     },
   ];
 
-  for (const t of tools) {
+  // 仅显示本关具备初始配额（或沙盒全开放）的装置，保持底栏克制简洁
+  const visibleTools = allTools.filter(
+    (t) =>
+      world.level.isSandbox ||
+      (world.level.inventory[t.kind] ?? 0) > 0 ||
+      world.inventory[t.kind] > 0
+  );
+
+  if (visibleTools.length === 0) {
+    const span = document.createElement('span');
+    span.style.fontSize = '11.5px';
+    span.style.color = '#5a6c82';
+    span.textContent = '本关无额外装置';
+    toolBarEl.appendChild(span);
+    return;
+  }
+
+  for (const t of visibleTools) {
     const count = world.inventory[t.kind];
     const btn = document.createElement('button');
     btn.className = 'tool-btn';
@@ -203,13 +281,9 @@ function renderToolBar(): void {
 }
 
 function syncDynamicUI(): void {
-  // 弹药显示
   ammoDisplayEl.textContent =
-    world.remainingAmmo < 0
-      ? '剩余宏电子: ∞'
-      : `剩余宏电子: ${world.remainingAmmo}`;
+    world.remainingAmmo < 0 ? '宏电子: ∞' : `宏电子: ${world.remainingAmmo}`;
 
-  // 运行/时停徽章
   if (world.paused) {
     simStatePill.className = 'state-pill paused';
     simStateText.textContent = '战术推演中 · PAUSED';
@@ -222,13 +296,21 @@ function syncDynamicUI(): void {
     btnPause.textContent = '时停推演 [Space]';
   }
 
-  // 宏电子状态指示
+  const activeCount = world.activeElectronCount;
   const e = world.electron;
-  if (!e || !e.alive) {
-    quantumStateVal.textContent = '基态待激发';
+  if (activeCount === 0 || !e || !e.alive) {
+    quantumStateVal.textContent = world.level.macroFusionEnabled
+      ? '待激发 · 支持双球宏聚变'
+      : '基态待激发';
     quantumStateVal.className = 'meter-value';
     stabilityBarEl.style.width = '100%';
     stabilityNumEl.textContent = '100%';
+  } else if (activeCount >= 2) {
+    quantumStateVal.textContent = `双球共鸣中 (${activeCount}/${world.maxConcurrentElectrons}) · 靠近即宏聚变`;
+    quantumStateVal.className = 'meter-value cloud';
+    const pct = Math.max(0, Math.round(e.stability));
+    stabilityBarEl.style.width = `${pct}%`;
+    stabilityNumEl.textContent = `${pct}%`;
   } else if (e.mode === 'cloud') {
     quantumStateVal.textContent = '量子概率云 · 叠加穿墙';
     quantumStateVal.className = 'meter-value cloud';
@@ -243,12 +325,10 @@ function syncDynamicUI(): void {
     stabilityNumEl.textContent = `${pct}%`;
   }
 
-  // 目标区概率幅遥测
   const targetPsi = Math.round(world.getTargetMaxPsi() * 100);
   psiBarEl.style.width = `${targetPsi}%`;
   psiNumEl.textContent = `${targetPsi}%`;
 
-  // 己方观测总开关按钮
   if (world.level.ambientObserved) {
     btnToggleObs.classList.remove('off');
     btnToggleObsText.textContent = '全明靶场 (常亮)';
@@ -264,19 +344,17 @@ function syncDynamicUI(): void {
     }
   }
 
-  // 激发按钮禁用条件
   btnLaunch.disabled =
     world.status !== 'playing' ||
-    (world.electron !== null && world.electron.alive) ||
+    world.activeElectronCount >= world.maxConcurrentElectrons ||
     world.remainingAmmo === 0;
 
-  // 目标清单
   const objStates = world.getObjectiveStates();
   objectiveListEl.innerHTML = '';
   if (objStates.length === 0) {
     const li = document.createElement('li');
     li.className = 'objective-item';
-    li.textContent = '自由物理沙盒模式：任意测试频段共振、磁场导引与观测坍缩。';
+    li.textContent = '自由物理沙盒模式：任意测试四元共振、光学遮蔽幕、宏聚变与观测坍缩。';
     objectiveListEl.appendChild(li);
   } else {
     for (const o of objStates) {
@@ -292,7 +370,6 @@ function syncDynamicUI(): void {
     }
   }
 
-  // 日志列表（仅变更时重绘 DOM）
   const logSig = `${world.logs.length}_${world.logs[0]?.text ?? ''}`;
   if (logSig !== lastLogSignature) {
     lastLogSignature = logSig;
@@ -305,7 +382,6 @@ function syncDynamicUI(): void {
       .join('');
   }
 
-  // 结算弹窗判定
   if (world.status !== lastStatusShown && world.status !== 'playing') {
     lastStatusShown = world.status;
     sound.stopAmbientHum();
@@ -313,11 +389,15 @@ function syncDynamicUI(): void {
 
     if (world.status === 'victory') {
       clearedLevelIds.add(world.level.id);
+      saveClearedSet(clearedLevelIds);
       renderLevelTabs();
       resultCard.classList.remove('failed');
       resultKicker.textContent = `${world.level.code} // EXPERIMENT VERIFIED`;
-      resultTitle.textContent = '物理实验成功';
+      resultTitle.textContent =
+        world.level.id === 'lvl-12' ? '全战役通关 · 宏电子终章' : '物理实验成功';
       resultDesc.textContent = world.statusReason;
+      resultArchive.textContent = world.level.archive;
+      resultArchive.style.display = 'block';
       const hasNext = currentLevelIndex < LEVELS.length - 1;
       btnNextLevel.style.display = hasNext ? 'inline-block' : 'none';
     } else {
@@ -325,12 +405,12 @@ function syncDynamicUI(): void {
       resultKicker.textContent = `${world.level.code} // CONTAINMENT BREACH`;
       resultTitle.textContent = '实验异常中止';
       resultDesc.textContent = world.statusReason;
+      resultArchive.style.display = 'none';
       btnNextLevel.style.display = 'none';
     }
   }
 }
 
-// 坐标转换：屏幕坐标 -> 逻辑世界坐标 (960 x 600)
 function clientToWorld(clientX: number, clientY: number): { x: number; y: number } {
   const rect = canvas.getBoundingClientRect();
   return {
@@ -339,10 +419,15 @@ function clientToWorld(clientX: number, clientY: number): { x: number; y: number
   };
 }
 
-// 鼠标交互事件绑定
+function getDeviceHandleOffset(kind: DeviceKind): number {
+  if (kind === 'deflector') return 46;
+  if (kind === 'screen') return 38;
+  if (kind === 'beacon') return 42;
+  return 0;
+}
+
 canvas.addEventListener('pointerdown', (ev) => {
   if (ev.button === 2) {
-    // 右键快速回收可移动装置
     const pos = clientToWorld(ev.clientX, ev.clientY);
     for (const dev of world.devices) {
       if (!dev.fixed && dist(pos.x, pos.y, dev.x, dev.y) <= 28) {
@@ -362,14 +447,19 @@ canvas.addEventListener('pointerdown', (ev) => {
   uiState.mouseX = pos.x;
   uiState.mouseY = pos.y;
 
-  // 1. 放置工具激活态：直接放置装置
+  // 1. 放置装置
   if (uiState.placementTool) {
-    const placed = world.placeDevice(uiState.placementTool, pos.x, pos.y, 0);
+    const defaultAngle =
+      uiState.placementTool === 'screen'
+        ? Math.PI / 2 // 遮蔽幕默认水平横置（阻挡上下光锥）
+        : uiState.placementTool === 'beacon'
+        ? -Math.PI / 2 // 便携信标默认朝上照射玻璃窗
+        : 0;
+    const placed = world.placeDevice(uiState.placementTool, pos.x, pos.y, defaultAngle);
     if (placed) {
       uiState.selectedDeviceId = placed.id;
       uiState.placementTool = null;
       renderToolBar();
-      // 刚放置磁偏转器后直接允许顺手拖向目标角度
       if (placed.kind === 'deflector') {
         dragMode = { kind: 'rotate_device', deviceId: placed.id };
       }
@@ -377,9 +467,9 @@ canvas.addEventListener('pointerdown', (ev) => {
     return;
   }
 
-  // 2. 点击独立己方观测信标（如窗外信标）直接切换开关
+  // 2. 点击固定己方观测信标开关（排除便携信标，由装置点击处理）
   for (const obs of world.observers) {
-    if (obs.owner === 'player' && obs.id !== 'obs-emitter') {
+    if (obs.owner === 'player' && !obs.sourceDeviceId && !obs.id.startsWith('obs-emitter')) {
       if (dist(pos.x, pos.y, obs.x, obs.y) <= 26) {
         world.toggleSingleObserver(obs.id);
         syncDynamicUI();
@@ -388,26 +478,34 @@ canvas.addEventListener('pointerdown', (ev) => {
     }
   }
 
-  // 3. 检测是否点中可调装置的旋转手柄或主体
+  // 3. 检测可调装置的旋转手柄或主体
   for (const dev of world.devices) {
     if (dev.fixed) continue;
-    if (dev.kind === 'deflector') {
-      const hx = dev.x + Math.cos(dev.angleRad) * 46;
-      const hy = dev.y + Math.sin(dev.angleRad) * 46;
+    const handleDist = getDeviceHandleOffset(dev.kind);
+    if (handleDist > 0) {
+      const hx = dev.x + Math.cos(dev.angleRad) * handleDist;
+      const hy = dev.y + Math.sin(dev.angleRad) * handleDist;
       if (dist(pos.x, pos.y, hx, hy) <= 18) {
         uiState.selectedDeviceId = dev.id;
         dragMode = { kind: 'rotate_device', deviceId: dev.id };
         return;
       }
     }
-    if (dist(pos.x, pos.y, dev.x, dev.y) <= 24) {
+    const bodyRadius = dev.kind === 'screen' ? 32 : 24;
+    if (dist(pos.x, pos.y, dev.x, dev.y) <= bodyRadius) {
       uiState.selectedDeviceId = dev.id;
-      dragMode = { kind: 'move_device', deviceId: dev.id };
+      dragMode = {
+        kind: 'move_device',
+        deviceId: dev.id,
+        startX: pos.x,
+        startY: pos.y,
+        moved: false,
+      };
       return;
     }
   }
 
-  // 4. 检测是否点中雷球发生器或瞄准手柄
+  // 4. 拖拽雷球发生器瞄准
   const aimHx = world.emitterX + Math.cos(world.emitterAngle) * 38;
   const aimHy = world.emitterY + Math.sin(world.emitterAngle) * 38;
   if (
@@ -431,7 +529,12 @@ canvas.addEventListener('pointermove', (ev) => {
     const a = Math.atan2(pos.y - world.emitterY, pos.x - world.emitterX);
     world.setEmitterAngle(a);
   } else if (dragMode.kind === 'move_device') {
-    world.moveDevice(dragMode.deviceId, pos.x, pos.y);
+    if (dist(pos.x, pos.y, dragMode.startX, dragMode.startY) > 5) {
+      dragMode.moved = true;
+    }
+    if (dragMode.moved) {
+      world.moveDevice(dragMode.deviceId, pos.x, pos.y);
+    }
   } else if (dragMode.kind === 'rotate_device') {
     const targetId = dragMode.deviceId;
     const dev = world.devices.find((d) => d.id === targetId);
@@ -443,6 +546,15 @@ canvas.addEventListener('pointermove', (ev) => {
 });
 
 window.addEventListener('pointerup', () => {
+  // 如果只是单击了便携观测信标而没有拖拽移动，直接原地切换它的光束开关！
+  if (dragMode.kind === 'move_device' && !dragMode.moved) {
+    const targetId = dragMode.deviceId;
+    const dev = world.devices.find((d) => d.id === targetId);
+    if (dev?.kind === 'beacon' && dev.linkedObserverId) {
+      world.toggleSingleObserver(dev.linkedObserverId);
+      syncDynamicUI();
+    }
+  }
   dragMode = { kind: 'none' };
 });
 
@@ -452,21 +564,21 @@ canvas.addEventListener('pointerleave', () => {
 
 canvas.addEventListener('contextmenu', (ev) => ev.preventDefault());
 
-// 滚轮微调选中偏转器角度
 canvas.addEventListener(
   'wheel',
   (ev) => {
     if (!uiState.selectedDeviceId) return;
     const dev = world.devices.find((d) => d.id === uiState.selectedDeviceId);
-    if (!dev || dev.fixed || dev.kind !== 'deflector') return;
+    if (!dev || dev.fixed) return;
+    if (dev.kind !== 'deflector' && dev.kind !== 'screen' && dev.kind !== 'beacon') return;
     ev.preventDefault();
-    const step = (ev.deltaY > 0 ? 1 : -1) * (Math.PI / 36); // 每次 5 度
+    const step = (ev.deltaY > 0 ? 1 : -1) * (Math.PI / 36);
     world.rotateDevice(dev.id, dev.angleRad + step);
   },
   { passive: false }
 );
 
-// 按钮与键盘快捷键绑定
+// 按钮与快捷键
 btnToggleObs.addEventListener('click', () => {
   world.setPlayerObserversActive(!world.playerObserversEnabled);
   syncDynamicUI();
@@ -536,7 +648,6 @@ window.addEventListener('keydown', (ev) => {
   }
 });
 
-// 画布尺寸自适应
 function handleResize(): void {
   const rect = stageShell.getBoundingClientRect();
   renderer.resizeToFit(rect.width - 24, rect.height - 24);
@@ -544,10 +655,8 @@ function handleResize(): void {
 window.addEventListener('resize', handleResize);
 handleResize();
 
-// 初始加载第 1 关
 selectLevel(0);
 
-// 固定步长仿真 + 60fps 渲染主循环
 let lastTime = performance.now();
 let accumulator = 0;
 

@@ -242,6 +242,42 @@ export class SoundSynth {
     osc.stop(now + 0.05);
   }
 
+  /** 宏聚变爆发声：深空低频共鸣 + 高频谐振泛音展开 */
+  public playMacroFusion(): void {
+    this.stopAmbientHum();
+    const ctx = this.ensureContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    // 低频深空共振
+    const sub = ctx.createOscillator();
+    const subGain = ctx.createGain();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(140, now);
+    sub.frequency.exponentialRampToValueAtTime(34, now + 0.9);
+    subGain.gain.setValueAtTime(0.32, now);
+    subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.95);
+    sub.connect(subGain);
+    subGain.connect(ctx.destination);
+    sub.start(now);
+    sub.stop(now + 0.98);
+
+    // 高频晶格清零和弦泛音
+    for (const freq of [880, 1320, 1760]) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, now);
+      osc.frequency.exponentialRampToValueAtTime(freq * 0.48, now + 0.65);
+      gain.gain.setValueAtTime(0.075, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.72);
+    }
+  }
+
   /** 撞墙退激消散声 */
   public playFizzle(): void {
     this.stopAmbientHum();

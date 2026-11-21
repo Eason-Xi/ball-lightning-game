@@ -1,43 +1,55 @@
 import {
+  DeviceState,
   GRID_CELL,
   GRID_COLS,
   GRID_ROWS,
   ObserverState,
   WallState,
 } from './types';
-import { computeObserverPolygon, isPointInObserverCone } from './geometry';
+import {
+  computeObserverPolygon,
+  extractScreenSegments,
+  isPointInObserverCone,
+  SightSegment,
+} from './geometry';
 
 export class ObserverSystem {
-  /** 全图每格当前是否处于任意开启的观测源覆盖中 (1=观测, 0=暗区盲区) */
   public gridObserved = new Uint8Array(GRID_COLS * GRID_ROWS);
-  /** 上一帧的观测掩码，用于判断某网格是否刚从暗变亮 */
   public prevGridObserved = new Uint8Array(GRID_COLS * GRID_ROWS);
+  private cachedScreens: SightSegment[] = [];
 
-  /** 更新敌方巡逻探照灯摆动并重算可见视锥多边形 + 观测网格 */
+  /** 更新观测源（巡逻灯、便携信标、光学遮蔽幕阴影、幽灵压制状态）并重算视锥多边形与全图观测网格 */
   public update(
     observers: ObserverState[],
     walls: WallState[],
+    devices: DeviceState[],
     elapsedTime: number,
     ambientObserved: boolean
   ): void {
     this.prevGridObserved.set(this.gridObserved);
+    this.cachedScreens = extractScreenSegments(devices);
 
     for (const obs of observers) {
-      if (obs.sweep && obs.active) {
+      const effectiveActive =
+        obs.active && !obs.permanentlyDisabled && !obs.suppressedByGhost;
+
+      if (obs.sweep && effectiveActive) {
         const phase = obs.sweep.phaseOffset ?? 0;
         obs.angleRad =
           obs.sweep.centerRad +
           Math.sin(elapsedTime * obs.sweep.speedRadPerSec + phase) *
             obs.sweep.amplitudeRad;
       }
-      if (obs.active) {
+
+      if (effectiveActive) {
         obs.polygon = computeObserverPolygon(
           obs.x,
           obs.y,
           obs.angleRad,
           obs.fovRad,
           obs.range,
-          walls
+          walls,
+          this.cachedScreens
         );
       } else {
         obs.polygon = [];
@@ -49,7 +61,6 @@ export class ObserverSystem {
       return;
     }
 
-    // 重算网格级观测状态
     for (let gy = 0; gy < GRID_ROWS; gy++) {
       const py = (gy + 0.5) * GRID_CELL;
       const rowOffset = gy * GRID_COLS;
@@ -73,11 +84,13 @@ export class ObserverSystem {
     y: number,
     observers: ObserverState[],
     walls: WallState[],
-    ambientObserved: boolean
+    ambientObserved: boolean,
+    ignoreObserverId?: string
   ): boolean {
     if (ambientObserved) return true;
     for (const obs of observers) {
-      if (!obs.active) continue;
+      if (obs.id === ignoreObserverId) continue;
+      if (!obs.active || obs.permanentlyDisabled || obs.suppressedByGhost) continue;
       if (
         isPointInObserverCone(
           x,
@@ -87,7 +100,8 @@ export class ObserverSystem {
           obs.angleRad,
           obs.fovRad,
           obs.range,
-          walls
+          walls,
+          this.cachedScreens
         )
       ) {
         return true;

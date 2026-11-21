@@ -1,4 +1,11 @@
-import { Vec2, WallState, WORLD_HEIGHT, WORLD_WIDTH } from './types';
+import { DeviceState, Vec2, WallState, WORLD_HEIGHT, WORLD_WIDTH } from './types';
+
+export interface SightSegment {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
 
 export function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v));
@@ -43,8 +50,37 @@ export function pointInRect(
 }
 
 /**
+ * 两条线段 (a->b) 与 (c->d) 求交，返回沿第一条线段的参数 t in [0, 1]
+ */
+export function segmentSegmentHit(
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  cx: number,
+  cy: number,
+  dx: number,
+  dy: number
+): number | null {
+  const rX = bx - ax;
+  const rY = by - ay;
+  const sX = dx - cx;
+  const sY = dy - cy;
+  const denom = rX * sY - rY * sX;
+  if (Math.abs(denom) < 1e-8) return null;
+
+  const qpx = cx - ax;
+  const qpy = cy - ay;
+  const t = (qpx * sY - qpy * sX) / denom;
+  const u = (qpx * rY - qpy * rX) / denom;
+  if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+    return t;
+  }
+  return null;
+}
+
+/**
  * 线段 (x1,y1)->(x2,y2) 与轴对齐矩形 [rx, ry, rw, rh] 的最近交点参数 t in [0, 1]
- * 不相交返回 null
  */
 export function segmentRectHit(
   x1: number,
@@ -103,10 +139,29 @@ export function segmentRectHit(
   return tMin;
 }
 
-/** 墙体是否阻挡光学观测射线（glass 透明允许光线穿过！） */
+/** 获取所有光学遮蔽幕（screen）的挡光线段 */
+export function extractScreenSegments(devices: DeviceState[]): SightSegment[] {
+  const segs: SightSegment[] = [];
+  for (const d of devices) {
+    if (d.kind !== 'screen') continue;
+    const half = d.radius;
+    // 遮蔽幕垂直于其法线朝向 angleRad（即沿着 angleRad + PI/2 方向延展）
+    const tx = -Math.sin(d.angleRad) * half;
+    const ty = Math.cos(d.angleRad) * half;
+    segs.push({
+      x1: d.x - tx,
+      y1: d.y - ty,
+      x2: d.x + tx,
+      y2: d.y + ty,
+    });
+  }
+  return segs;
+}
+
+/** 墙体是否阻挡光学观测射线（glass 透明允许光线穿过） */
 export function wallBlocksSight(wall: WallState): boolean {
   if (wall.destroyed) return false;
-  return wall.kind === 'concrete' || wall.kind === 'steel_door';
+  return wall.kind === 'concrete' || wall.kind === 'steel_door' || wall.kind === 'metal_rail';
 }
 
 /** 墙体是否阻挡经典态球状闪电 */
@@ -114,21 +169,19 @@ export function wallBlocksClassical(wall: WallState): boolean {
   return !wall.destroyed;
 }
 
-/**
- * 射线 (ox, oy) 沿 angleRad 方向、最大距离 maxDist，检测所有遮光墙体的最近交点
- */
+/** 射线检测所有遮光墙体与光学遮蔽幕的最近交点 */
 export function castSightRay(
   ox: number,
   oy: number,
   angleRad: number,
   maxDist: number,
-  walls: WallState[]
+  walls: WallState[],
+  screens: SightSegment[] = []
 ): Vec2 {
   const ex = ox + Math.cos(angleRad) * maxDist;
   const ey = oy + Math.sin(angleRad) * maxDist;
   let bestT = 1;
 
-  // 场景边界裁剪
   const borderHits: number[] = [];
   const dx = ex - ox;
   const dy = ey - oy;
@@ -143,9 +196,12 @@ export function castSightRay(
   for (const w of walls) {
     if (!wallBlocksSight(w)) continue;
     const t = segmentRectHit(ox, oy, ex, ey, w.x, w.y, w.w, w.h, 0);
-    if (t !== null && t < bestT) {
-      bestT = t;
-    }
+    if (t !== null && t < bestT) bestT = t;
+  }
+
+  for (const s of screens) {
+    const t = segmentSegmentHit(ox, oy, ex, ey, s.x1, s.y1, s.x2, s.y2);
+    if (t !== null && t < bestT) bestT = t;
   }
 
   return {
@@ -154,7 +210,7 @@ export function castSightRay(
   };
 }
 
-/** 判断一点是否在某观测扇形视锥内且无遮挡 */
+/** 判断一点是否在某观测扇形视锥内且不被墙体或遮蔽幕遮挡 */
 export function isPointInObserverCone(
   px: number,
   py: number,
@@ -163,7 +219,8 @@ export function isPointInObserverCone(
   angleRad: number,
   fovRad: number,
   range: number,
-  walls: WallState[]
+  walls: WallState[],
+  screens: SightSegment[] = []
 ): boolean {
   const dx = px - ox;
   const dy = py - oy;
@@ -178,7 +235,6 @@ export function isPointInObserverCone(
     }
   }
 
-  // 检测连线是否被遮光墙体阻挡（终点微缩避免刚好在目标边界误挡）
   const d = Math.sqrt(d2);
   const shrink = Math.max(0, (d - 1.5) / d);
   const tx = ox + dx * shrink;
@@ -191,23 +247,31 @@ export function isPointInObserverCone(
       return false;
     }
   }
+
+  for (const s of screens) {
+    const hit = segmentSegmentHit(ox, oy, tx, ty, s.x1, s.y1, s.x2, s.y2);
+    if (hit !== null && hit > 0.001 && hit < 0.999) {
+      return false;
+    }
+  }
+
   return true;
 }
 
-/** 计算观测源的精确 2D 视锥可见多边形 */
+/** 计算观测源的精确 2D 视锥可见多边形（含光学遮蔽幕锐利阴影） */
 export function computeObserverPolygon(
   ox: number,
   oy: number,
   angleRad: number,
   fovRad: number,
   range: number,
-  walls: WallState[]
+  walls: WallState[],
+  screens: SightSegment[] = []
 ): Vec2[] {
   const isFullCircle = fovRad >= Math.PI * 1.99;
   const halfFov = fovRad * 0.5;
   const offsets: number[] = [];
 
-  // 均匀采样确保扇形外弧圆滑
   const steps = isFullCircle ? 72 : Math.max(24, Math.ceil((fovRad / Math.PI) * 56));
   for (let i = 0; i <= steps; i++) {
     const off = isFullCircle
@@ -216,23 +280,26 @@ export function computeObserverPolygon(
     offsets.push(off);
   }
 
-  // 补充遮光墙体的角点射线（边缘刀锋阴影）
   const eps = 0.0008;
+  const pushCorner = (cx: number, cy: number) => {
+    const a = Math.atan2(cy - oy, cx - ox);
+    const rel = angleDiff(angleRad, a);
+    if (isFullCircle || Math.abs(rel) <= halfFov) {
+      offsets.push(rel - eps, rel, rel + eps);
+    }
+  };
+
   for (const w of walls) {
     if (!wallBlocksSight(w)) continue;
-    const corners: [number, number][] = [
-      [w.x, w.y],
-      [w.x + w.w, w.y],
-      [w.x, w.y + w.h],
-      [w.x + w.w, w.y + w.h],
-    ];
-    for (const [cx, cy] of corners) {
-      const a = Math.atan2(cy - oy, cx - ox);
-      const rel = angleDiff(angleRad, a);
-      if (isFullCircle || Math.abs(rel) <= halfFov) {
-        offsets.push(rel - eps, rel, rel + eps);
-      }
-    }
+    pushCorner(w.x, w.y);
+    pushCorner(w.x + w.w, w.y);
+    pushCorner(w.x, w.y + w.h);
+    pushCorner(w.x + w.w, w.y + w.h);
+  }
+
+  for (const s of screens) {
+    pushCorner(s.x1, s.y1);
+    pushCorner(s.x2, s.y2);
   }
 
   offsets.sort((a, b) => a - b);
@@ -244,8 +311,49 @@ export function computeObserverPolygon(
 
   for (const off of offsets) {
     const clampedOff = isFullCircle ? off : clamp(off, -halfFov, halfFov);
-    pts.push(castSightRay(ox, oy, angleRad + clampedOff, range, walls));
+    pts.push(castSightRay(ox, oy, angleRad + clampedOff, range, walls, screens));
   }
 
   return pts;
+}
+
+/**
+ * 导电金属壁（metal_rail）贴壁滑行求解：
+ * 当经典态球状闪电命中 metal_rail 时，根据命中边法线将其速度重定向为沿金属表面切向滑行，并微推离壁面防嵌入。
+ */
+export function computeMetalRailSlide(
+  hx: number,
+  hy: number,
+  vx: number,
+  vy: number,
+  speed: number,
+  wall: WallState
+): { x: number; y: number; vx: number; vy: number } {
+  const pad = 7.5;
+  const distLeft = Math.abs(hx - wall.x);
+  const distRight = Math.abs(hx - (wall.x + wall.w));
+  const distTop = Math.abs(hy - wall.y);
+  const distBottom = Math.abs(hy - (wall.y + wall.h));
+  const minDist = Math.min(distLeft, distRight, distTop, distBottom);
+
+  let nx = hx;
+  let ny = hy;
+  let nvx = vx;
+  let nvy = vy;
+
+  if (minDist === distTop || minDist === distBottom) {
+    // 命中上/下水平面 -> 沿水平方向切向滑行
+    ny = minDist === distTop ? wall.y - pad : wall.y + wall.h + pad;
+    const signX = Math.abs(vx) > 5 ? Math.sign(vx) : hx < wall.x + wall.w / 2 ? -1 : 1;
+    nvx = signX * speed;
+    nvy = 0;
+  } else {
+    // 命中左/右垂直面 -> 沿垂直方向切向滑行
+    nx = minDist === distLeft ? wall.x - pad : wall.x + wall.w + pad;
+    const signY = Math.abs(vy) > 5 ? Math.sign(vy) : hy < wall.y + wall.h / 2 ? -1 : 1;
+    nvx = 0;
+    nvy = signY * speed;
+  }
+
+  return { x: nx, y: ny, vx: nvx, vy: nvy };
 }
