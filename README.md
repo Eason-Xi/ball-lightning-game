@@ -1,7 +1,8 @@
 # 代号：宏电子（Project: Macro-Electron）
 
 > 基于刘慈欣《球状闪电》硬科幻设定打造的 2.5D 俯视角物理战术解谜游戏 Demo。  
-> 完整游戏设计文档见 [PRD.md](./PRD.md)。
+> **在线试玩**：https://eason-xi.github.io/ball-lightning-game/  
+> **完整设计文档**：[PRD.md](./PRD.md)
 
 ## 核心物理机制
 
