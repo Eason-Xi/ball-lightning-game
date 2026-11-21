@@ -17,6 +17,7 @@ import {
 import { SimulationWorld } from '../sim/World';
 import { CollapseEngine } from '../sim/CollapseEngine';
 import { predictTrajectory } from '../sim/EMFieldSolver';
+import { GuideGhost } from '../ui/TutorialSystem';
 
 export interface RenderUIState {
   blueprintMode: boolean;
@@ -26,6 +27,8 @@ export interface RenderUIState {
   mouseY: number;
   isHoveringCanvas: boolean;
   visualTime: number;
+  showGuideGhosts: boolean;
+  guideGhosts: GuideGhost[];
 }
 
 /**
@@ -81,6 +84,11 @@ export class BlueprintRenderer {
       if (eng) {
         this.drawProbabilityCloud(world, e, eng, ui.visualTime);
       }
+    }
+
+    // 3.5 教学/卡关参考虚影（建议布阵坐标与瞄准方向）
+    if (ui.showGuideGhosts && ui.guideGhosts.length > 0) {
+      this.drawGuideGhosts(ui.guideGhosts, ui.visualTime);
     }
 
     // 4. 电磁场装置、光学遮蔽幕与便携观测信标
@@ -1074,6 +1082,113 @@ export class BlueprintRenderer {
     ctx.textAlign = 'center';
     ctx.fillText(`点击放置 ${nameMap[kind]} (Esc取消)`, x, y - 24);
     ctx.restore();
+  }
+
+  private drawGuideGhosts(ghosts: GuideGhost[], t: number): void {
+    const ctx = this.ctx;
+    const pulse = 0.55 + 0.3 * Math.sin(t * 4.5);
+
+    for (const g of ghosts) {
+      ctx.save();
+      ctx.translate(g.x, g.y);
+
+      if (g.kind === 'aim') {
+        // 发射器推荐瞄准方向虚线
+        ctx.strokeStyle = `rgba(255, 214, 0, ${pulse})`;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 6]);
+        ctx.lineDashOffset = -t * 24;
+        ctx.beginPath();
+        ctx.moveTo(28 * Math.cos(g.angleRad), 28 * Math.sin(g.angleRad));
+        ctx.lineTo(155 * Math.cos(g.angleRad), 155 * Math.sin(g.angleRad));
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.font = '700 11px Menlo, monospace';
+        ctx.fillStyle = `rgba(255, 214, 0, ${Math.min(1, pulse + 0.2)})`;
+        ctx.textAlign = 'center';
+        ctx.fillText(
+          g.label,
+          120 * Math.cos(g.angleRad),
+          120 * Math.sin(g.angleRad) - 12
+        );
+      } else if (g.kind === 'screen') {
+        ctx.save();
+        ctx.rotate(g.angleRad);
+        ctx.strokeStyle = `rgba(255, 214, 0, ${pulse})`;
+        ctx.fillStyle = 'rgba(255, 214, 0, 0.1)';
+        ctx.lineWidth = 1.8;
+        ctx.setLineDash([5, 4]);
+        ctx.strokeRect(-7, -56, 14, 112);
+        ctx.fillRect(-7, -56, 14, 112);
+        ctx.setLineDash([]);
+        ctx.restore();
+
+        ctx.font = '700 11px Menlo, monospace';
+        ctx.fillStyle = '#ffd600';
+        ctx.textAlign = 'center';
+        ctx.fillText(g.label, 0, -20);
+      } else if (g.kind === 'beacon') {
+        ctx.strokeStyle = `rgba(126, 231, 135, ${pulse})`;
+        ctx.fillStyle = 'rgba(126, 231, 135, 0.1)';
+        ctx.lineWidth = 1.8;
+        ctx.setLineDash([5, 4]);
+        ctx.beginPath();
+        ctx.arc(0, 0, 22, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.save();
+        ctx.rotate(g.angleRad);
+        ctx.strokeStyle = `rgba(126, 231, 135, ${pulse})`;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(42, 0);
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.font = '700 11px Menlo, monospace';
+        ctx.fillStyle = '#7ee787';
+        ctx.textAlign = 'center';
+        ctx.fillText(g.label, 0, 36);
+      } else {
+        // deflector 推荐放置靶圈与建议方向箭头
+        ctx.strokeStyle = `rgba(255, 214, 0, ${pulse})`;
+        ctx.fillStyle = 'rgba(255, 214, 0, 0.08)';
+        ctx.lineWidth = 1.8;
+        ctx.setLineDash([5, 4]);
+        ctx.beginPath();
+        ctx.arc(0, 0, 24, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.save();
+        ctx.rotate(g.angleRad);
+        ctx.strokeStyle = `rgba(255, 214, 0, ${pulse + 0.15})`;
+        ctx.fillStyle = `rgba(255, 214, 0, ${pulse + 0.15})`;
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(46, 0);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(54, 0);
+        ctx.lineTo(42, -6);
+        ctx.lineTo(42, 6);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+
+        ctx.font = '700 11px Menlo, monospace';
+        ctx.fillStyle = '#ffd600';
+        ctx.textAlign = 'center';
+        ctx.fillText(g.label, 0, -30);
+      }
+
+      ctx.restore();
+    }
   }
 
   private drawFx(fx: FxEvent): void {

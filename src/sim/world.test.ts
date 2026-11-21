@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { SimulationWorld } from './World';
 import { LEVELS } from '../levels/levels';
 import { FIXED_DT } from './types';
+import { evaluateLiveGuide } from '../ui/TutorialSystem';
 
 function byId(id: string) {
   const lvl = LEVELS.find((l) => l.id === id);
@@ -250,5 +251,27 @@ describe('《代号：宏电子》完整四幕 12 关物理与通关全链路自
     runSteps(w, 0.4);
     expect(w.status).toBe('victory');
     expect(w.entities.find((e) => e.id === 'core-12')?.destroyed).toBe(true);
+  });
+
+  it('实时分步教学引导覆盖全部 12 个战役关卡并能动态推进步骤', () => {
+    for (const lvl of LEVELS) {
+      const w = new SimulationWorld(lvl);
+      const step = evaluateLiveGuide(w);
+      if (lvl.isSandbox) {
+        expect(step).toBeNull();
+      } else {
+        expect(step).not.toBeNull();
+        expect(step!.message.length).toBeGreaterThan(8);
+      }
+    }
+
+    // 验证 EXP-01 放置偏转器后引导自动从 步骤 1/3 -> 2/3 -> 3/3 推进
+    const w1 = new SimulationWorld(byId('lvl-01'));
+    expect(evaluateLiveGuide(w1)?.badge).toBe('步骤 1/3');
+    w1.placeDevice('deflector', 245, 210, 1.0);
+    expect(evaluateLiveGuide(w1)?.badge).toBe('步骤 2/3');
+    w1.placeDevice('deflector', 435, 525, -0.7);
+    expect(evaluateLiveGuide(w1)?.badge).toBe('步骤 3/3');
+    expect(evaluateLiveGuide(w1)?.highlight).toBe('launch');
   });
 });

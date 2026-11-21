@@ -188,6 +188,17 @@ body {
   color: var(--accent-danger);
 }
 
+.btn-icon.btn-guide {
+  border-color: rgba(255, 214, 0, 0.45);
+  color: var(--spec-delta);
+  background: rgba(255, 214, 0, 0.08);
+}
+
+.btn-icon.btn-guide:hover {
+  background: rgba(255, 214, 0, 0.16);
+  color: #fff8cc;
+}
+
 .key-badge {
   font-family: var(--font-mono);
   font-size: 10px;
@@ -327,6 +338,197 @@ body {
 .toast-banner.hidden {
   opacity: 0;
   transform: translate(-50%, 8px);
+}
+
+/* 实时分步指挥引导条 */
+.live-guide-bar {
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border-radius: 10px;
+  background: rgba(10, 16, 28, 0.92);
+  border: 1px solid rgba(255, 214, 0, 0.42);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  max-width: min(760px, 92%);
+  z-index: 5;
+}
+
+.live-guide-bar.hidden {
+  display: none;
+}
+
+.guide-step-badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255, 214, 0, 0.16);
+  border: 1px solid rgba(255, 214, 0, 0.5);
+  color: var(--spec-delta);
+  white-space: nowrap;
+}
+
+.guide-step-msg {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #f1f5f9;
+}
+
+.guide-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.guide-mini-btn {
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.14s ease;
+}
+
+.guide-mini-btn:hover {
+  color: #ffffff;
+  border-color: var(--border-strong);
+}
+
+.guide-mini-btn.active {
+  border-color: rgba(255, 214, 0, 0.55);
+  color: var(--spec-delta);
+  background: rgba(255, 214, 0, 0.1);
+}
+
+/* 30 秒新手可视化图解引导卡片 */
+.onboarding-card {
+  width: min(760px, 92%);
+  padding: 24px 26px;
+  border-radius: 16px;
+  background: #0c121e;
+  border: 1px solid rgba(0, 229, 255, 0.4);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.8);
+}
+
+.onboarding-title {
+  font-size: 21px;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 6px;
+}
+
+.onboarding-sub {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  margin-bottom: 18px;
+}
+
+.guide-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.guide-card {
+  padding: 13px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-subtle);
+}
+
+.guide-svg {
+  height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  background: #070b13;
+  border: 1px solid rgba(125, 165, 215, 0.12);
+}
+
+.guide-svg svg {
+  width: 100%;
+  height: 100%;
+}
+
+.guide-card h3 {
+  font-size: 13.5px;
+  color: #ffffff;
+  margin-bottom: 6px;
+}
+
+.guide-card p {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.guide-card code {
+  font-family: var(--font-mono);
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(0, 229, 255, 0.14);
+  color: var(--spec-alpha);
+}
+
+.onboarding-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.quick-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.quick-keys kbd {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid var(--border-strong);
+  color: #ffffff;
+  margin-right: 3px;
+}
+
+/* 引导呼吸脉冲高亮（自动指引玩家该点哪个按钮） */
+.guide-pulse {
+  position: relative;
+  border-color: #ffd600 !important;
+  box-shadow: 0 0 0 2px rgba(255, 214, 0, 0.45), 0 0 18px rgba(255, 214, 0, 0.55) !important;
+  animation: guidePulse 1.3s ease-in-out infinite;
+}
+
+@keyframes guidePulse {
+  0%, 100% {
+    box-shadow: 0 0 0 2px rgba(255, 214, 0, 0.45), 0 0 16px rgba(255, 214, 0, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(255, 214, 0, 0.78), 0 0 26px rgba(255, 214, 0, 0.8);
+  }
 }
 
 /* Result Modal */

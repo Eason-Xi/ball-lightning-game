@@ -12,8 +12,10 @@ import {
 import { dist } from './sim/geometry';
 import { BlueprintRenderer, RenderUIState } from './render/BlueprintRenderer';
 import { SoundSynth } from './render/SoundSynth';
+import { evaluateLiveGuide, GuideHighlightTarget } from './ui/TutorialSystem';
 
 const STORAGE_KEY = 'macro_electron_cleared_v2';
+const ONBOARDING_SEEN_KEY = 'macro_electron_onboarding_seen_v1';
 
 function loadClearedSet(): Set<string> {
   try {
@@ -65,8 +67,18 @@ const btnToggleObsText = document.getElementById('btnToggleObsText') as HTMLElem
 const btnPause = document.getElementById('btnPause') as HTMLButtonElement;
 const btnLaunch = document.getElementById('btnLaunch') as HTMLButtonElement;
 const btnBlueprint = document.getElementById('btnBlueprint') as HTMLButtonElement;
+const btnShowGuide = document.getElementById('btnShowGuide') as HTMLButtonElement;
 const btnAudio = document.getElementById('btnAudio') as HTMLButtonElement;
 const btnReset = document.getElementById('btnReset') as HTMLButtonElement;
+
+const liveGuideBar = document.getElementById('liveGuideBar') as HTMLElement;
+const guideStepBadge = document.getElementById('guideStepBadge') as HTMLElement;
+const guideStepMsg = document.getElementById('guideStepMsg') as HTMLElement;
+const btnToggleGhosts = document.getElementById('btnToggleGhosts') as HTMLButtonElement;
+const btnCloseGuideBar = document.getElementById('btnCloseGuideBar') as HTMLButtonElement;
+
+const onboardingModal = document.getElementById('onboardingModal') as HTMLElement;
+const btnStartGuided = document.getElementById('btnStartGuided') as HTMLButtonElement;
 
 const simStatePill = document.getElementById('simStatePill') as HTMLElement;
 const simStateText = document.getElementById('simStateText') as HTMLElement;
@@ -119,7 +131,12 @@ const uiState: RenderUIState = {
   mouseY: 0,
   isHoveringCanvas: false,
   visualTime: 0,
+  showGuideGhosts: true,
+  guideGhosts: [],
 };
+
+let guideBarVisible = true;
+let lastHighlightTarget: GuideHighlightTarget = null;
 
 type DragMode =
   | { kind: 'none' }
@@ -165,6 +182,7 @@ function selectLevel(index: number): void {
   renderStaticLevelInfo();
   renderSpectrumBar();
   renderToolBar();
+  lastHighlightTarget = null;
   syncDynamicUI();
 }
 
@@ -214,7 +232,11 @@ function renderSpectrumBar(): void {
       <span>${meta.symbol} ${meta.shortName}</span>
     `;
     btn.addEventListener('click', () => {
-      if (world.setSpectrum(spec)) renderSpectrumBar();
+      if (world.setSpectrum(spec)) {
+        renderSpectrumBar();
+        lastHighlightTarget = null;
+        syncDynamicUI();
+      }
     });
     spectrumBarEl.appendChild(btn);
   });
@@ -266,6 +288,7 @@ function renderToolBar(): void {
     const count = world.inventory[t.kind];
     const btn = document.createElement('button');
     btn.className = 'tool-btn';
+    btn.dataset.tool = t.kind;
     btn.title = t.tip;
     if (uiState.placementTool === t.kind) btn.classList.add('active');
     btn.disabled = count <= 0 && !world.level.isSandbox;
@@ -275,6 +298,8 @@ function renderToolBar(): void {
     btn.addEventListener('click', () => {
       uiState.placementTool = uiState.placementTool === t.kind ? null : t.kind;
       renderToolBar();
+      lastHighlightTarget = null;
+      syncDynamicUI();
     });
     toolBarEl.appendChild(btn);
   }
@@ -349,6 +374,27 @@ function syncDynamicUI(): void {
     world.activeElectronCount >= world.maxConcurrentElectrons ||
     world.remainingAmmo === 0;
 
+  // 实时分步教学引导条 & 按钮呼吸脉冲高亮同步
+  const guide = evaluateLiveGuide(world);
+  uiState.guideGhosts = guideBarVisible && guide ? guide.ghosts : [];
+
+  if (guideBarVisible && guide) {
+    liveGuideBar.classList.remove('hidden');
+    guideStepBadge.textContent = guide.badge;
+    guideStepMsg.textContent = guide.message;
+    btnToggleGhosts.style.display = guide.ghosts.length > 0 ? 'inline-block' : 'none';
+    btnToggleGhosts.classList.toggle('active', uiState.showGuideGhosts);
+    btnToggleGhosts.textContent = uiState.showGuideGhosts ? '位置虚影: 开' : '位置虚影: 关';
+  } else {
+    liveGuideBar.classList.add('hidden');
+  }
+
+  const nextHighlight: GuideHighlightTarget = guideBarVisible && guide ? guide.highlight : null;
+  if (nextHighlight !== lastHighlightTarget) {
+    lastHighlightTarget = nextHighlight;
+    applyGuideHighlight(nextHighlight);
+  }
+
   const objStates = world.getObjectiveStates();
   objectiveListEl.innerHTML = '';
   if (objStates.length === 0) {
@@ -411,6 +457,25 @@ function syncDynamicUI(): void {
   }
 }
 
+function applyGuideHighlight(target: GuideHighlightTarget): void {
+  document.querySelectorAll('.guide-pulse').forEach((el) => el.classList.remove('guide-pulse'));
+  if (!target) return;
+
+  if (target === 'launch') {
+    btnLaunch.classList.add('guide-pulse');
+  } else if (target === 'obs') {
+    btnToggleObs.classList.add('guide-pulse');
+  } else if (target === 'pause') {
+    btnPause.classList.add('guide-pulse');
+  } else if (target.startsWith('spec:')) {
+    const spec = target.slice(5);
+    spectrumBarEl.querySelector(`[data-spec="${spec}"]`)?.classList.add('guide-pulse');
+  } else if (target.startsWith('tool:')) {
+    const tool = target.slice(5);
+    toolBarEl.querySelector(`[data-tool="${tool}"]`)?.classList.add('guide-pulse');
+  }
+}
+
 function clientToWorld(clientX: number, clientY: number): { x: number; y: number } {
   const rect = canvas.getBoundingClientRect();
   return {
@@ -447,20 +512,39 @@ canvas.addEventListener('pointerdown', (ev) => {
   uiState.mouseX = pos.x;
   uiState.mouseY = pos.y;
 
-  // 1. 放置装置
+  // 1. 放置装置（若开启位置虚影且靠近推荐虚影，自动温柔吸附并预设建议朝向！）
   if (uiState.placementTool) {
-    const defaultAngle =
+    let placeX = pos.x;
+    let placeY = pos.y;
+    let placeAngle =
       uiState.placementTool === 'screen'
-        ? Math.PI / 2 // 遮蔽幕默认水平横置（阻挡上下光锥）
+        ? Math.PI / 2
         : uiState.placementTool === 'beacon'
-        ? -Math.PI / 2 // 便携信标默认朝上照射玻璃窗
+        ? -Math.PI / 2
         : 0;
-    const placed = world.placeDevice(uiState.placementTool, pos.x, pos.y, defaultAngle);
+    let snapped = false;
+
+    if (uiState.showGuideGhosts) {
+      for (const g of uiState.guideGhosts) {
+        if (g.kind === uiState.placementTool && dist(pos.x, pos.y, g.x, g.y) <= 44) {
+          placeX = g.x;
+          placeY = g.y;
+          placeAngle = g.angleRad;
+          snapped = true;
+          break;
+        }
+      }
+    }
+
+    const placed = world.placeDevice(uiState.placementTool, placeX, placeY, placeAngle);
     if (placed) {
       uiState.selectedDeviceId = placed.id;
       uiState.placementTool = null;
       renderToolBar();
-      if (placed.kind === 'deflector') {
+      applyGuideHighlight(lastHighlightTarget);
+      if (snapped) {
+        showToast('已自动吸附至推荐位置与角度（仍可自由拖动微调）');
+      } else if (placed.kind === 'deflector') {
         dragMode = { kind: 'rotate_device', deviceId: placed.id };
       }
     }
@@ -599,6 +683,34 @@ btnBlueprint.addEventListener('click', () => {
   btnBlueprint.classList.toggle('active', uiState.blueprintMode);
 });
 
+btnShowGuide.addEventListener('click', () => {
+  guideBarVisible = true;
+  onboardingModal.classList.remove('hidden');
+  syncDynamicUI();
+});
+
+btnStartGuided.addEventListener('click', () => {
+  onboardingModal.classList.add('hidden');
+  guideBarVisible = true;
+  uiState.showGuideGhosts = true;
+  try {
+    window.localStorage.setItem(ONBOARDING_SEEN_KEY, '1');
+  } catch {
+    // ignore
+  }
+  syncDynamicUI();
+});
+
+btnToggleGhosts.addEventListener('click', () => {
+  uiState.showGuideGhosts = !uiState.showGuideGhosts;
+  syncDynamicUI();
+});
+
+btnCloseGuideBar.addEventListener('click', () => {
+  guideBarVisible = false;
+  syncDynamicUI();
+});
+
 btnAudio.addEventListener('click', () => {
   sound.setEnabled(!sound.enabled);
   btnAudio.textContent = sound.enabled ? '声景: 开' : '声景: 关';
@@ -638,13 +750,29 @@ window.addEventListener('keydown', (ev) => {
     uiState.selectedDeviceId = null;
     renderToolBar();
   } else if (key === '1') {
-    if (world.setSpectrum('alpha')) renderSpectrumBar();
+    if (world.setSpectrum('alpha')) {
+      renderSpectrumBar();
+      lastHighlightTarget = null;
+      syncDynamicUI();
+    }
   } else if (key === '2') {
-    if (world.setSpectrum('beta')) renderSpectrumBar();
+    if (world.setSpectrum('beta')) {
+      renderSpectrumBar();
+      lastHighlightTarget = null;
+      syncDynamicUI();
+    }
   } else if (key === '3') {
-    if (world.setSpectrum('delta')) renderSpectrumBar();
+    if (world.setSpectrum('delta')) {
+      renderSpectrumBar();
+      lastHighlightTarget = null;
+      syncDynamicUI();
+    }
   } else if (key === '4') {
-    if (world.setSpectrum('gamma')) renderSpectrumBar();
+    if (world.setSpectrum('gamma')) {
+      renderSpectrumBar();
+      lastHighlightTarget = null;
+      syncDynamicUI();
+    }
   }
 });
 
@@ -656,6 +784,15 @@ window.addEventListener('resize', handleResize);
 handleResize();
 
 selectLevel(0);
+
+// 首次进入自动弹出 30 秒新手图解速览卡
+try {
+  if (!window.localStorage.getItem(ONBOARDING_SEEN_KEY)) {
+    onboardingModal.classList.remove('hidden');
+  }
+} catch {
+  onboardingModal.classList.remove('hidden');
+}
 
 let lastTime = performance.now();
 let accumulator = 0;
