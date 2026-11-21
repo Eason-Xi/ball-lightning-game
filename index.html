@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>代号：宏电子 — 球状闪电量子战术实验</title>
+  </head>
+  <body>
+    <div id="app">
+      <!-- 顶部军工示波器导航栏 -->
+      <header class="topbar">
+        <div class="brand">
+          <span class="pulse-dot"></span>
+          <span class="brand-code">PROJECT // MACRO-ELECTRON</span>
+          <span class="brand-sub">球状闪电物理战术实验</span>
+        </div>
+
+        <nav class="level-tabs" id="levelTabs"></nav>
+
+        <div class="topbar-actions">
+          <button class="btn-icon" id="btnBlueprint" title="切换蓝图材质视图 (Tab)">
+            <span class="key-badge">TAB</span> 材质蓝图
+          </button>
+          <button class="btn-icon" id="btnAudio" title="开关实验声景">
+            声景: 开
+          </button>
+          <button class="btn-icon btn-warn" id="btnReset" title="重置当前实验 (R)">
+            <span class="key-badge">R</span> 重置
+          </button>
+        </div>
+      </header>
+
+      <!-- 主工作区：画布 + 右侧极简实验面板 -->
+      <main class="workspace">
+        <section class="stage-shell">
+          <canvas id="gameCanvas"></canvas>
+
+          <!-- 状态角标：实时显示当前量子状态与时停状态 -->
+          <div class="stage-overlay-top">
+            <div class="state-pill" id="simStatePill">
+              <span class="state-indicator"></span>
+              <span id="simStateText">战术推演中 · PAUSED</span>
+            </div>
+            <div class="quantum-meter" id="quantumMeter">
+              <span class="meter-label">宏电子态</span>
+              <span class="meter-value" id="quantumStateVal">基态待激发</span>
+            </div>
+          </div>
+
+          <!-- 实时科研提示条 -->
+          <div class="toast-banner hidden" id="toastBanner"></div>
+
+          <!-- 关卡结算浮层 -->
+          <div class="result-modal hidden" id="resultModal">
+            <div class="result-card">
+              <div class="result-kicker" id="resultKicker">EXPERIMENT REPORT</div>
+              <h2 class="result-title" id="resultTitle">实验成功</h2>
+              <p class="result-desc" id="resultDesc"></p>
+              <div class="result-actions">
+                <button class="btn-primary" id="btnNextLevel">进入下一实验 →</button>
+                <button class="btn-ghost" id="btnRetryModal">重新推演 (R)</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 右侧战术简报与实时遥测 -->
+        <aside class="sidebar">
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-tag">MISSION BRIEF</span>
+              <span class="ammo-tag" id="ammoDisplay">剩余宏电子: 3</span>
+            </div>
+            <h1 class="level-title" id="levelTitle">01 // 空泡与偏转</h1>
+            <p class="level-brief" id="levelBrief"></p>
+            <ul class="objective-list" id="objectiveList"></ul>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-tag">TELEMETRY // 量子遥测</span>
+            </div>
+            <div class="telemetry-grid">
+              <div class="tele-item">
+                <span class="tele-label">激发寿命</span>
+                <div class="progress-track">
+                  <div class="progress-fill" id="stabilityBar"></div>
+                </div>
+                <span class="tele-num" id="stabilityNum">100%</span>
+              </div>
+              <div class="tele-item">
+                <span class="tele-label">目标区概率幅 Ψ</span>
+                <div class="progress-track">
+                  <div class="progress-fill psi-fill" id="psiBar"></div>
+                </div>
+                <span class="tele-num" id="psiNum">0%</span>
+              </div>
+            </div>
+            <div class="hint-box" id="hintBox"></div>
+          </div>
+
+          <div class="panel panel-log">
+            <div class="panel-header">
+              <span class="panel-tag">PHYSICS LOG // 实验日志</span>
+            </div>
+            <div class="event-log" id="eventLog"></div>
+          </div>
+        </aside>
+      </main>
+
+      <!-- 底部核心控制台（频段、装置、激发、观测开关） -->
+      <footer class="dock">
+        <div class="dock-group">
+          <span class="dock-label">谐振频段 [1-4]</span>
+          <div class="spectrum-bar" id="spectrumBar"></div>
+        </div>
+
+        <div class="dock-divider"></div>
+
+        <div class="dock-group">
+          <span class="dock-label">战术布设</span>
+          <div class="tool-bar" id="toolBar"></div>
+        </div>
+
+        <div class="dock-divider"></div>
+
+        <div class="dock-group dock-actions">
+          <button class="btn-obs" id="btnToggleObs" title="一键开关全部己方观测源 (O)">
+            <span class="obs-dot"></span>
+            <span id="btnToggleObsText">己方观测: 开启 [O]</span>
+          </button>
+          <button class="btn-pause" id="btnPause" title="实时演算 / 战术时停切换 (Space)">
+            时停推演 [Space]
+          </button>
+          <button class="btn-launch" id="btnLaunch" title="从雷球发生器激发一颗宏电子 (Enter / F)">
+            ⚡ 激发宏电子 [F]
+          </button>
+        </div>
+      </footer>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
